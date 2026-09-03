@@ -100,6 +100,30 @@ $RECYCLE.BIN/
 *.swo
 *~
 
+# --- Word / Excel / PowerPoint の一時ファイル ---
+# ファイルを開いている間だけ作られる隠しファイル（~$ で始まるもの）
+~$*
+~$*.doc*
+~$*.xls*
+~$*.ppt*
+
+# 自動保存・復元用のファイル
+*.asd
+*.wbk
+*.xlk
+*.~vsd*
+*.ppt~
+*.tmp.doc*
+*.tmp.xls*
+*.tmp.ppt*
+
+# LibreOffice / OpenOffice のロックファイル
+.~lock.*#
+
+# バックアップとして自動生成されるファイル
+Backup of *.doc*
+Backup\ of\ *.doc*
+
 # --- Node（フロント補助ツールを入れた時用） ---
 node_modules/
 npm-debug.log*
