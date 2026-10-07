@@ -1,0 +1,31 @@
+-- =========================================
+-- 02_insert_master.sql
+-- 実行ユーザー：CREEPY
+-- 内容：マスタ（ARCHETYPE_MASTER・PRICE_MASTER）に動作確認用の仮データを入れる
+--       01_create_tables.sql の後に実行する
+--
+-- ※ 現時点では実行しない（環境構築ではスキーマ作成 00 までにとどめる）
+-- ※ ここに入れるのはすべて「仮データ」。名前・説明文・金額は本番用ではない
+-- =========================================
+
+-- T-09 ARCHETYPE_MASTER（仮データ）
+INSERT INTO ARCHETYPE_MASTER (NAME, DESCRIPTION, IMAGE_URL)
+VALUES ('アットホーム派', '【仮】家族や親しい友人と、温かい時間を過ごしたい', NULL);
+INSERT INTO ARCHETYPE_MASTER (NAME, DESCRIPTION, IMAGE_URL)
+VALUES ('ゴージャス派', '【仮】華やかな会場と演出で、特別な一日にしたい', NULL);
+INSERT INTO ARCHETYPE_MASTER (NAME, DESCRIPTION, IMAGE_URL)
+VALUES ('ナチュラル派', '【仮】自然の中で、肩ひじ張らない式にしたい', NULL);
+
+-- T-06 PRICE_MASTER（仮データ。IS_VARIABLE：Y = 変動あり、N = 固定）
+INSERT INTO PRICE_MASTER (ITEM_NAME, CATEGORY, BASE_PRICE, IS_VARIABLE, DESCRIPTION, CREATED_AT, UPDATED_AT)
+VALUES ('会場使用料', '会場', 300000, 'N', '【仮】挙式・披露宴会場の使用料', SYSTIMESTAMP, SYSTIMESTAMP);
+INSERT INTO PRICE_MASTER (ITEM_NAME, CATEGORY, BASE_PRICE, IS_VARIABLE, DESCRIPTION, CREATED_AT, UPDATED_AT)
+VALUES ('料理（洋食コース）', '料理', 15000, 'Y', '【仮】1人あたりの料金', SYSTIMESTAMP, SYSTIMESTAMP);
+INSERT INTO PRICE_MASTER (ITEM_NAME, CATEGORY, BASE_PRICE, IS_VARIABLE, DESCRIPTION, CREATED_AT, UPDATED_AT)
+VALUES ('ドリンク（フリードリンク）', '料理', 4000, 'Y', '【仮】1人あたりの料金', SYSTIMESTAMP, SYSTIMESTAMP);
+INSERT INTO PRICE_MASTER (ITEM_NAME, CATEGORY, BASE_PRICE, IS_VARIABLE, DESCRIPTION, CREATED_AT, UPDATED_AT)
+VALUES ('ウェディングドレス', '衣装', 250000, 'N', '【仮】レンタル1着', SYSTIMESTAMP, SYSTIMESTAMP);
+INSERT INTO PRICE_MASTER (ITEM_NAME, CATEGORY, BASE_PRICE, IS_VARIABLE, DESCRIPTION, CREATED_AT, UPDATED_AT)
+VALUES ('キャンドル演出', '演出', 50000, 'N', '【仮】テーブルキャンドルの演出', SYSTIMESTAMP, SYSTIMESTAMP);
+
+COMMIT;
