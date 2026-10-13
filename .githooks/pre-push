@@ -1,0 +1,39 @@
+#!/bin/sh
+# GitHub に送る前に、送り先のブランチと送り方を確かめる。
+. "$(dirname "$0")/_rules.sh"
+
+is_zero() {
+    printf '%s\n' "$1" | grep -Eq '^0+$'
+}
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+    case "$remote_ref" in
+        refs/heads/*) ;;
+        *) continue ;;   # タグなどはここでは確かめない
+    esac
+    branch=${remote_ref#refs/heads/}
+
+    if is_protected_branch "$branch"; then
+        reject "「$branch」へは直接送信できません。" \
+               "作業ブランチを送信して、develop 向けの PR を作ってください。取り込みは GitHub で人が行います。"
+    fi
+    if is_zero "$local_sha"; then
+        reject "GitHub のブランチ「$branch」を消そうとしています。ブランチの削除はしない決まりです。" \
+               "不要なブランチは、リーダーが GitHub の画面で消します。"
+    fi
+    if ! is_release_branch "$branch" && ! is_work_branch_name "$branch"; then
+        reject "ブランチ名「$branch」はチームの決まりに合いません。" \
+               "feature/〇〇・fix/〇〇・docs/〇〇 の形にしてください。"
+    fi
+    if ! is_zero "$remote_sha"; then
+        if ! git cat-file -e "${remote_sha}^{commit}" 2>/dev/null; then
+            reject "GitHub の「$branch」に、手元にない変更があります。" \
+                   "先に最新を取得（フェッチ）して、変更を取り込んでから送信してください。"
+        fi
+        if ! git merge-base --is-ancestor "$remote_sha" "$local_sha"; then
+            reject "GitHub の「$branch」の変更を上書きする送信（強制送信）になります。強制送信はしない決まりです。" \
+                   "最新を取得して、自分の変更を上に積み直してから送信してください。困ったらリーダーに相談してください。"
+        fi
+    fi
+done
+exit 0
