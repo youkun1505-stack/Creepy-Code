@@ -20,8 +20,8 @@
       "PowerShell(mvnw.cmd -q test *)",
       "Bash(./mvnw.cmd -q test *)",
       "PowerShell(./mvnw.cmd -q test *)",
-      "Bash(rm -rf .harness/tmp/*)",
-      "PowerShell(Remove-Item -Recurse -Force .harness/tmp/*)"
+      "Bash(rm -rf .ai-tmp/*)",
+      "PowerShell(Remove-Item -Recurse -Force .ai-tmp/*)"
     ],
     "ask": [
       "Bash(git push *)",

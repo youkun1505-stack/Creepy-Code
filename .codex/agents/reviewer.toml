@@ -1,7 +1,7 @@
 # Codex のサブエージェント定義（レビュー役）
 # モデルを変えたいときは model を書き換える（リーダーが行う）。
 name = "reviewer"
-description = "Creepy Code のレビュー役。司会役から作業メモ（.harness/tasks/.../task.md）の機能番号と、確かめるチケットのパスを受け取り、変更内容を受け入れ条件と突き合わせて判定し、問題をチケットの形で返す。ファイルは変更しない。"
+description = "Creepy Code のレビュー役。司会役から作業メモ（.ai-tmp/.../task.md）の機能番号と、確かめるチケットのパスを受け取り、変更内容を受け入れ条件と突き合わせて判定し、問題をチケットの形で返す。ファイルは変更しない。"
 model = "gpt-6.1-sol"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"

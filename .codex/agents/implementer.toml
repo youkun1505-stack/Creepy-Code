@@ -1,7 +1,7 @@
 # Codex のサブエージェント定義（実装役）
 # モデルを変えたいときは model を書き換える（リーダーが行う）。
 name = "implementer"
-description = "Creepy Code の実装役。司会役から作業メモ（.harness/tasks/.../task.md）の機能番号と、直すチケットのパスを受け取り、その1機能だけを実装・修正する。レビューや Git 操作はしない。"
+description = "Creepy Code の実装役。司会役から作業メモ（.ai-tmp/.../task.md）の機能番号と、直すチケットのパスを受け取り、その1機能だけを実装・修正する。レビューや Git 操作はしない。"
 model = "gpt-6-luna"
 model_reasoning_effort = "medium"
 sandbox_mode = "workspace-write"
