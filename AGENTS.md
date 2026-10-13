@@ -84,7 +84,7 @@ Codex はこのファイルを直接読みます。Claude Code は `.claude/CLAU
   `main`・`develop`・`release/*`・`hotfix/*` の上では、ファイルを変更しない・コミットしない。
 - ブランチは Gitflow に従う。AI が作ってよいのは、最新の `develop` から作る次の3種類だけ：
   `feature/〇〇`（新しい機能）・`fix/〇〇`（不具合の修正）・`docs/〇〇`（資料だけの変更）。
-  名前は英小文字とハイフン。issue があれば番号を先頭に付ける（例：`feature/12-plan-view`）。
+  issue があれば番号を先頭に付ける（例：`feature/12-plan-view`）。
   `release/*`・`hotfix/*` は人が作る。
 - **`main` と `develop` へは直接送信しない。** 取り込みは必ず `develop` 向けの PR で、取り込むのは人。
 - 送信（push）と PR 作成は、内容を見せてメンバーの「はい」をもらってから、自分の作業ブランチだけ行う。

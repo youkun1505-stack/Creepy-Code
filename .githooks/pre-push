@@ -23,7 +23,7 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     fi
     if ! is_release_branch "$branch" && ! is_work_branch_name "$branch"; then
         reject "ブランチ名「$branch」はチームの決まりに合いません。" \
-               "feature/〇〇・fix/〇〇・docs/〇〇 の形にしてください（英小文字・数字・ハイフン）。"
+               "feature/〇〇・fix/〇〇・docs/〇〇 の形にしてください。"
     fi
     if ! is_zero "$remote_sha"; then
         if ! git cat-file -e "${remote_sha}^{commit}" 2>/dev/null; then

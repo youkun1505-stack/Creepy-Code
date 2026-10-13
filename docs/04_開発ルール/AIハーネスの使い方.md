@@ -56,9 +56,8 @@ Claude Code（Claude デスクトップアプリの「Code」や、VS Code な�
 
 | 止めるもの | 表示される理由の例 |
 | --- | --- |
-| `main`・`develop` へのコミット | いまのブランチは「develop」です。main・develop には直接コミットできません |
-| 決まりに合わないブランチ名 | feature/〇〇・fix/〇〇・docs/〇〇 の形にしてください |
-| 決まりに合わないコミットメッセージ | 例：feat: プラン提案画面を追加 |
+| `main` へのコミット | いまのブランチは「main」です。main には直接コミットできません |
+| feature/・fix/・docs/ で始まらないブランチの送信 | feature/〇〇・fix/〇〇・docs/〇〇 の形にしてください |
 | `main`・`develop` への送信 | 作業ブランチを送信して、develop 向けの PR を作ってください |
 | 強制送信・GitHub のブランチ削除 | 強制送信はしない決まりです |
 

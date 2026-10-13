@@ -62,7 +62,7 @@ PR を作ったら、`.ai-tmp/<ブランチ名>/` をまるごと削除する。
 
 | 仕組み | 場所 | 止めるもの |
 | --- | --- | --- |
-| Git のフック | `.githooks/` | `main`・`develop` へのコミット、決まりに合わないブランチ名・コミットメッセージ、`main`・`develop` への送信、強制送信、GitHub のブランチ削除 |
+| Git のフック | `.githooks/` | `main` へのコミット、`main`・`develop` への送信、feature/・fix/・docs/ で始まらない作業ブランチの送信、強制送信、GitHub のブランチ削除 |
 | Claude Code のフック | `.claude/settings.json` の `hooks` | 開いたときに Git のフックを有効にする。`main`・`develop`・`release/*`・`hotfix/*` の上でのファイル変更 |
 | 許可の設定 | `.claude/settings.json` の `permissions` | 取り込み・`reset --hard`・`--no-verify` などのコマンド。送信と PR 作成は毎回メンバーに確認 |
 
