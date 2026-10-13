@@ -1,6 +1,8 @@
 # Creepy Code — Claude Code 用の指示
 
-@AGENTS.md
+> このファイルは `.claude/CLAUDE.md`（Claude Code が読む場所）。共通ルールは、リポジトリ直下の `AGENTS.md` を下の1行で読み込んでいる。
+
+@../AGENTS.md
 
 ---
 

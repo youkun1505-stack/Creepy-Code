@@ -1,0 +1,78 @@
+# Codex の決まり（Git の操作）。forbidden は実行させない、prompt は毎回メンバーに確認する。
+# Claude Code では .claude/settings.json の permissions が同じ役目。確実に止めるのは .githooks/ のフック。
+
+prefix_rule(
+    pattern = ["git", ["merge", "rebase", "clean", "config"]],
+    decision = "forbidden",
+    justification = "取り込み・付け替え・clean・git config の変更は AI にさせない決まりです（AGENTS.md の 5）",
+    match = ["git merge develop", "git rebase develop", "git clean -fd", "git config user.name x"],
+    not_match = ["git status"],
+)
+
+prefix_rule(
+    pattern = ["git", "reset", "--hard"],
+    decision = "forbidden",
+    justification = "reset --hard は禁止です（AGENTS.md の 5）",
+    match = ["git reset --hard HEAD"],
+    not_match = ["git reset HEAD file.txt"],
+)
+
+prefix_rule(
+    pattern = ["git", "branch", ["-D", "-d", "--delete"]],
+    decision = "forbidden",
+    justification = "ブランチの削除は禁止です（AGENTS.md の 5）",
+    match = ["git branch -D feature/x"],
+    not_match = ["git branch --show-current"],
+)
+
+prefix_rule(
+    pattern = ["git", "commit", ["--no-verify", "-n"]],
+    decision = "forbidden",
+    justification = "フックを飛ばすコミットは禁止です（AGENTS.md の 5）",
+    match = ["git commit --no-verify -m x"],
+    not_match = ["git commit -m x"],
+)
+
+prefix_rule(
+    pattern = ["git", "push", ["--force", "-f", "--force-with-lease", "--delete", "-d"]],
+    decision = "forbidden",
+    justification = "強制送信・GitHub のブランチ削除は禁止です（AGENTS.md の 5）",
+    match = ["git push --force origin feature/x", "git push --delete origin feature/x"],
+    not_match = ["git push origin feature/x"],
+)
+
+prefix_rule(
+    pattern = ["git", "push", "origin", ["main", "master", "develop", "HEAD:main", "HEAD:develop"]],
+    decision = "forbidden",
+    justification = "main・develop へは直接送信しない決まりです。作業ブランチを送信して develop 向けの PR を作ってください",
+    match = ["git push origin develop", "git push origin main"],
+    not_match = ["git push origin feature/x"],
+)
+
+prefix_rule(
+    pattern = ["git", "push"],
+    decision = "prompt",
+    justification = "送信はメンバーの「はい」をもらってから行います",
+    match = ["git push origin feature/x", "git push -u origin feature/x"],
+)
+
+prefix_rule(
+    pattern = ["git", ["switch", "checkout", "pull", "stash"]],
+    decision = "prompt",
+    justification = "ブランチの切り替え・取得・一時退避はメンバーに確認してから行います",
+    match = ["git switch -c feature/x develop", "git pull"],
+)
+
+prefix_rule(
+    pattern = ["gh", "pr", "merge"],
+    decision = "forbidden",
+    justification = "PR の取り込みは人が行います",
+    match = ["gh pr merge 12"],
+)
+
+prefix_rule(
+    pattern = ["gh", "pr", "create"],
+    decision = "prompt",
+    justification = "PR の作成はメンバーの「はい」をもらってから行います",
+    match = ["gh pr create --base develop"],
+)

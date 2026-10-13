@@ -1,16 +1,18 @@
 # AIハーネスの使い方
 
 AI に実装を頼むときの決まりごとをまとめた仕組みです。新しいコマンドや追加の道具は使いません。
-Claude Code（Claude デスクトップアプリの「Code」や、VS Code などで使う Claude Code）でこのリポジトリを開くと、
-次のファイルが自動で読み込まれ、AI がその決まりどおりに動きます。
+Claude Code（Claude デスクトップアプリの「Code」や、VS Code などで使う Claude Code）や Codex でこのリポジトリを開くと、
+次のファイルが自動で読み込まれ、AI がその決まりどおりに動きます。ファイルの置き場所は、それぞれの公式の説明に合わせています。
 
 | ファイル | 役割 |
 | --- | --- |
-| `AGENTS.md` | すべての AI が守るルール（Codex もこれを読む） |
-| `CLAUDE.md` | Claude Code 用の進め方（`AGENTS.md` を読み込んだうえで、役割の分け方を足したもの） |
-| `.claude/agents/implementer.md` | 実装役（軽いモデル） |
-| `.claude/agents/reviewer.md` | レビュー役（賢いモデル） |
-| `.claude/settings.json` | AI にさせない操作（取り込みなど）、毎回確認する操作、Claude Code のフック |
+| `AGENTS.md`（リポジトリ直下） | すべての AI が守るルール。Codex はこれを直接読む |
+| `.claude/CLAUDE.md` | Claude Code 用の進め方（`AGENTS.md` を読み込んだうえで、役割の分け方を足したもの） |
+| `.claude/agents/implementer.md`・`reviewer.md` | Claude Code の実装役（軽いモデル）とレビュー役（賢いモデル） |
+| `.claude/settings.json` | Claude Code にさせない操作（取り込みなど）、毎回確認する操作、フック |
+| `.codex/agents/implementer.toml`・`reviewer.toml` | Codex の実装役（軽いモデル）とレビュー役（賢いモデル） |
+| `.codex/rules/git.rules` | Codex にさせない操作、毎回確認する操作 |
+| `.codex/hooks.json` | Codex のフック（Git のフックを有効にする、main・develop の上でのファイル変更を止める） |
 | `.githooks/` | Git のフック。人が操作しても AI が操作しても、Git のルールに合わないコミット・送信を止める |
 | `.harness/templates/` | 作業メモ・チケット・引き継ぎ記録のひな形 |
 
@@ -37,7 +39,7 @@ Claude Code（Claude デスクトップアプリの「Code」や、VS Code な�
 - `main`・`develop` への直接の送信、強制送信、取り込み（merge）、`reset --hard`、ブランチの削除
 - `main`・`develop` の上でのファイル変更やコミット（作業の前に必ずブランチを確認します）
 - 作業メモの「変更してよい範囲」の外の変更
-- API キーなどの秘密情報を書くこと、`CLAUDE.md`・`AGENTS.md`・`.claude/` の変更（リーダーに頼まれたときを除く）
+- API キーなどの秘密情報を書くこと、`AGENTS.md`・`.claude/`・`.codex/` の変更（リーダーに頼まれたときを除く）
 
 ## 作業の記録の置き場所
 
@@ -58,7 +60,9 @@ Claude Code（Claude デスクトップアプリの「Code」や、VS Code な�
 | `main`・`develop` への送信 | 作業ブランチを送信して、develop 向けの PR を作ってください |
 | 強制送信・GitHub のブランチ削除 | 強制送信はしない決まりです |
 
-Claude Code でこのリポジトリを開くと、フックは自動で有効になります。Claude Code を使わずに SourceTree だけで
+Claude Code・Codex でこのリポジトリを開くと、フックは自動で有効になります。
+Codex では、最初に「このプロジェクトを信頼する」を選び、`/hooks` でフックの内容を確認して許可してください
+（信頼しないと `.codex/` の設定が読み込まれません）。AI を使わずに SourceTree だけで
 作業する人は、一度だけリーダーに有効にしてもらってください（`git config core.hooksPath .githooks`）。
 
 ## リーダーにお願いしたいこと

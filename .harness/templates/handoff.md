@@ -24,7 +24,7 @@
 ## 変更してよい範囲
 
 - F-2：`...`
-- 変更してはいけないもの：`CLAUDE.md`・`AGENTS.md`・`.claude/`・`.gitignore`・秘密情報
+- 変更してはいけないもの：`AGENTS.md`・`.claude/`・`.codex/`・`.githooks/`・`.gitignore`・秘密情報
 
 ## 未解決のチケット（要約）
 

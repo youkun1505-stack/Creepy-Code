@@ -93,6 +93,7 @@ $RECYCLE.BIN/
 .claude/*
 !.claude/agents/
 !.claude/settings.json
+!.claude/CLAUDE.md
 
 # --- 一時ファイル / バックアップ ---
 *.tmp

@@ -1,7 +1,8 @@
 # Creepy Code — AI 共通ルール（AGENTS.md）
 
 このファイルは、このリポジトリで作業するすべての AI（Claude Code・Codex など）が守るルールです。
-Claude Code は `CLAUDE.md` からこのファイルを読み込みます。Codex はこのファイルを直接読みます。
+Codex はこのファイルを直接読みます。Claude Code は `.claude/CLAUDE.md` からこのファイルを読み込みます。
+それぞれの道具だけの設定は、`.claude/`（Claude Code）と `.codex/`（Codex）にあります。
 
 ## 1. プロジェクト
 
@@ -26,9 +27,16 @@ Claude Code は `CLAUDE.md` からこのファイルを読み込みます。Code
 | 実装役 | 作業メモの1機能だけを実装する。開いているチケットを直す。決めたテストだけ実行する | Git を操作しない。変更してよい範囲の外を変えない |
 | レビュー役 | 変更と受け入れ条件を突き合わせ、問題をチケットとして返す | ファイルを変更しない。実装役の説明をうのみにしない |
 
-- 実装役とレビュー役を別の会話に分けられない道具（Codex など）では、実装が終わったら一度会話を閉じ、
-  新しい会話でレビューする。レビューの会話には作業メモ・チケット・変更内容（`git diff`）だけを渡す。
-- モデルの使い分け：レビュー役は賢いモデル、実装役は軽いモデルを使う（Claude Code の設定は `.claude/agents/`）。
+- 実装役とレビュー役は、道具ごとのサブエージェントとして用意してある。どちらも名前は `implementer`（実装役）と `reviewer`（レビュー役）。
+  - Claude Code：`.claude/agents/implementer.md`・`.claude/agents/reviewer.md`
+  - Codex：`.codex/agents/implementer.toml`・`.codex/agents/reviewer.toml`
+- モデルの使い分け：レビュー役は賢いモデル、実装役は軽いモデルを使う（上の定義ファイルに書いてある）。
+- 司会役が渡すのは次だけ。会話の流れや自分の考え、実装役の報告文は渡さない（うのみにさせないため）。
+  - 実装役へ：作業メモのパス、機能の番号、直すチケットのパス（重さ「高」「中」で `未対応`・`再発` のもの）
+  - レビュー役へ：作業メモのパス、機能の番号、状態が `修正済み` のチケットのパス
+- サブエージェントとして呼ばれた場合は、司会役の仕事はせず、自分の定義ファイルの役割だけを行う。
+- サブエージェントを使えない道具では、実装が終わったら一度会話を閉じ、新しい会話でレビューする。
+  レビューの会話には作業メモ・チケット・変更内容（`git diff`）だけを渡す。
 
 ## 4. 作業の進め方
 
@@ -78,11 +86,11 @@ Claude Code は `CLAUDE.md` からこのファイルを読み込みます。Code
 - コミットの作者はメンバー本人のまま（Git の名前を変えない）。
 - これらのルールの多くは、Git のフック（`.githooks/`）でも確かめている。止められたら、フックを外したり
   `--no-verify` で飛ばしたりせず、表示された理由に従って直す。フックは `git config core.hooksPath .githooks` で有効になる
-  （Claude Code では開いたときに自動で有効になる）。
+  （Claude Code・Codex では、開いたときにフックの設定で自動で有効になる）。
 
 ## 6. 変更してはいけないもの
 
-- `CLAUDE.md`・`AGENTS.md`・`.claude/`・`.githooks/`・`.gitignore`・`.gitattributes`（リーダーに頼まれたときだけ）
+- `AGENTS.md`・`.claude/`・`.codex/`・`.githooks/`・`.gitignore`・`.gitattributes`（リーダーに頼まれたときだけ）
 - 秘密情報：API キーをどこにも書かない（Gemini の API キーは環境変数 `GEMINI_API_KEY`）。`.env` などを読まない。
 - `docs/` の Word・PowerPoint・Excel ファイル
 - `db/保留/` の SQL を実行しない。授業用の DB ユーザーとテーブルに触らない。

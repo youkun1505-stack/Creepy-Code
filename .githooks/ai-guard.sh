@@ -1,7 +1,7 @@
 #!/bin/sh
-# Claude Code のフックから呼ばれる。main・develop・release・hotfix の上では、AI にファイルを変更させない。
-# 終了コード 2 で、Claude Code はその操作を止める。
-dir="${CLAUDE_PROJECT_DIR:-.}"
+# Claude Code・Codex のフックから呼ばれる。main・develop・release・hotfix の上では、AI にファイルを変更させない。
+# 終了コード 2 で、Claude Code・Codex はその操作を止める。
+dir="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || echo .)}"
 . "$(dirname "$0")/_rules.sh"
 branch=$(git -C "$dir" symbolic-ref --short -q HEAD 2>/dev/null)
 [ -z "$branch" ] && exit 0
