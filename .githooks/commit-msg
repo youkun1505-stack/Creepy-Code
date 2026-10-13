@@ -1,0 +1,14 @@
+#!/bin/sh
+# コミットメッセージの1行目が、チームの形式（feat: など）になっているかを確かめる。
+. "$(dirname "$0")/_rules.sh"
+first=$(sed -n '1p' "$1" | tr -d '\r')
+case "$first" in
+    Merge*|Revert*|fixup!*|squash!*|amend!*) exit 0 ;;
+esac
+if ! printf '%s\n' "$first" | grep -Eq '^(feat|fix|docs|style|refactor|test|chore)(\([^)]+\))?: .+'; then
+    reject "コミットメッセージの1行目がチームの形式に合いません。" \
+           "例：feat: プラン提案画面を追加 ／ fix: 料金の計算を修正 ／ docs: 手順書を更新" \
+           "使える頭の言葉：feat・fix・docs・style・refactor・test・chore（後ろに「: 」と内容）" \
+           "今の1行目：$first"
+fi
+exit 0
