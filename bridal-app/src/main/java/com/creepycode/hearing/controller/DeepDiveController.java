@@ -1,11 +1,11 @@
 package com.creepycode.hearing.controller;
 
-import java.security.Principal;
 import java.util.List;
 import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -41,15 +41,18 @@ public class DeepDiveController {
     private static final int MAX_ANSWER_LENGTH = 1000;
 
     private final DeepDiveService deepDiveService;
+    // TODO: ログイン機能（別担当）ができたら、ログイン中の顧客の USER_ID に置き換える（Claude）
+    private final Long userId;
 
-    public DeepDiveController(DeepDiveService deepDiveService) {
+    public DeepDiveController(DeepDiveService deepDiveService, @Value("${app.hearing.dev-user-id}") Long userId) {
         this.deepDiveService = deepDiveService;
+        this.userId = userId;
     }
 
     /** 画面を表示する。質問がまだ無いときは「生成中」の表示になり、画面側から質問の生成を呼び出す。 */
     @GetMapping
-    public String show(Principal principal, Model model) {
-        OnboardingAnswer answer = deepDiveService.findOrCreateAnswer(principal.getName());
+    public String show(Model model) {
+        OnboardingAnswer answer = deepDiveService.findOrCreateAnswer(userId);
         List<DeepDiveQa> qaList = deepDiveService.readQaList(answer);
         DeepDiveForm form = new DeepDiveForm();
         form.setAnswers(qaList.stream().map(qa -> qa.answer() == null ? "" : qa.answer()).toList());
@@ -61,8 +64,8 @@ public class DeepDiveController {
     /** AI に質問を作らせる（画面の「生成中」表示から呼ばれる）。結果は JSON で返す。 */
     @PostMapping("/questions")
     @ResponseBody
-    public ResponseEntity<Map<String, Object>> generate(Principal principal, HttpSession session) {
-        OnboardingAnswer answer = deepDiveService.findOrCreateAnswer(principal.getName());
+    public ResponseEntity<Map<String, Object>> generate(HttpSession session) {
+        OnboardingAnswer answer = deepDiveService.findOrCreateAnswer(userId);
         try {
             deepDiveService.generateQuestions(answer);
             session.removeAttribute(FAILURE_COUNT);
@@ -79,8 +82,8 @@ public class DeepDiveController {
 
     /** 回答を保存する。 */
     @PostMapping
-    public String submit(Principal principal, @ModelAttribute DeepDiveForm deepDiveForm, Model model) {
-        OnboardingAnswer answer = deepDiveService.findOrCreateAnswer(principal.getName());
+    public String submit(@ModelAttribute DeepDiveForm deepDiveForm, Model model) {
+        OnboardingAnswer answer = deepDiveService.findOrCreateAnswer(userId);
         List<DeepDiveQa> qaList = deepDiveService.readQaList(answer);
         List<String> answers = deepDiveForm.getAnswers();
         if (qaList.isEmpty() || answers.size() != qaList.size()) {

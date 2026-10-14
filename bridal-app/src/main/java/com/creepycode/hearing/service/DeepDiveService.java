@@ -9,11 +9,8 @@ import java.util.Locale;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Sort;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
-import com.creepycode.auth.entity.User;
-import com.creepycode.auth.repository.UserRepository;
 import com.creepycode.common.ai.AiClient;
 import com.creepycode.common.exception.AiException;
 import com.creepycode.hearing.dto.DeepDiveQa;
@@ -49,27 +46,22 @@ public class DeepDiveService {
             """;
 
     private final AiClient aiClient;
-    private final UserRepository userRepository;
     private final OnboardingAnswerRepository answerRepository;
     private final ArchetypeMasterRepository archetypeRepository;
     private final ObjectMapper objectMapper;
 
-    public DeepDiveService(AiClient aiClient, UserRepository userRepository,
-            OnboardingAnswerRepository answerRepository, ArchetypeMasterRepository archetypeRepository,
-            ObjectMapper objectMapper) {
+    public DeepDiveService(AiClient aiClient, OnboardingAnswerRepository answerRepository,
+            ArchetypeMasterRepository archetypeRepository, ObjectMapper objectMapper) {
         this.aiClient = aiClient;
-        this.userRepository = userRepository;
         this.answerRepository = answerRepository;
         this.archetypeRepository = archetypeRepository;
         this.objectMapper = objectMapper;
     }
 
-    /** ログイン中の顧客の、事前ヒアリングの回答を返す。まだ無いときは仮の回答を作る。 */
-    public OnboardingAnswer findOrCreateAnswer(String email) {
-        User user = userRepository.findByEmailAndDeletedAtIsNull(email)
-                .orElseThrow(() -> new UsernameNotFoundException("利用者が見つかりません"));
-        return answerRepository.findFirstByUserIdOrderByCreatedAtDesc(user.getUserId())
-                .orElseGet(() -> createProvisionalAnswer(user.getUserId()));
+    /** その顧客の、事前ヒアリングの回答を返す。まだ無いときは仮の回答を作る。 */
+    public OnboardingAnswer findOrCreateAnswer(Long userId) {
+        return answerRepository.findFirstByUserIdOrderByCreatedAtDesc(userId)
+                .orElseGet(() -> createProvisionalAnswer(userId));
     }
 
     /** 保存してある深掘り質問と回答を返す。まだ質問を作っていないときは空のリストを返す。 */

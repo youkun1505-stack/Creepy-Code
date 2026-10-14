@@ -16,7 +16,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  */
 class DeepDiveServiceTest {
 
-    private final DeepDiveService service = new DeepDiveService(new DummyAiClient(), null, null, null,
+    private final DeepDiveService service = new DeepDiveService(new DummyAiClient(), null, null,
             new ObjectMapper());
 
     @Test

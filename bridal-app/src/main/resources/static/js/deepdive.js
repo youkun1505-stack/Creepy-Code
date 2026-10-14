@@ -8,8 +8,9 @@
     const retry = document.getElementById('deepDiveRetry');
     const giveUp = document.getElementById('deepDiveGiveUp');
     const retryButton = document.getElementById('deepDiveRetryButton');
-    const csrfToken = document.querySelector('meta[name="_csrf"]').content;
-    const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+    // CSRF トークンは、Spring Security が有効なときだけ画面に入っている
+    const csrfToken = document.querySelector('meta[name="_csrf"]');
+    const csrfHeader = document.querySelector('meta[name="_csrf_header"]');
 
     // 表示を「待っている」「やり直せる」「あきらめる」のどれか1つに切り替える
     function show(target) {
@@ -23,7 +24,7 @@
         try {
             const response = await fetch(loading.dataset.generateUrl, {
                 method: 'POST',
-                headers: { [csrfHeader]: csrfToken },
+                headers: csrfToken && csrfHeader ? { [csrfHeader.content]: csrfToken.content } : {},
             });
             if (response.ok) {
                 // 質問ができたので、質問と回答欄のある画面を表示し直す
