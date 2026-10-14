@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ja" xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- JavaScript から POST するときに使う CSRF トークン -->
+    <meta name="_csrf" th:content="${_csrf.token}">
+    <meta name="_csrf_header" th:content="${_csrf.headerName}">
+    <title layout:title-pattern="$CONTENT_TITLE | $LAYOUT_TITLE">AIブライダルプランニング</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/css/bootstrap.min.css}">
+    <link rel="stylesheet" th:href="@{/css/common.css}">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container d-flex justify-content-between align-items-center">
+            <span class="site-header__title">AIブライダルプランニング</span>
+            <form th:action="@{/logout}" method="post">
+                <button type="submit" class="btn btn-sm btn-outline-secondary">ログアウト</button>
+            </form>
+        </div>
+    </header>
+
+    <main class="container site-main" layout:fragment="content">
+        <!-- 各画面の中身がここに入る -->
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">Creepy Code</div>
+    </footer>
+
+    <th:block layout:fragment="scripts">
+        <!-- 各画面の JavaScript がここに入る -->
+    </th:block>
+</body>
+</html>

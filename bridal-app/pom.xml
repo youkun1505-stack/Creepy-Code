@@ -44,7 +44,7 @@
             <artifactId>thymeleaf-extras-springsecurity6</artifactId>
         </dependency>
 
-        <!-- DB アクセス（Spring Data JPA ＋ Oracle） -->
+        <!-- DB アクセス（Spring Data JPA ＋ Supabase の PostgreSQL） -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
@@ -72,6 +72,11 @@
             <groupId>org.webjars</groupId>
             <artifactId>bootstrap</artifactId>
             <version>${bootstrap.version}</version>
+        </dependency>
+        <!-- /webjars/bootstrap/css/... のように、バージョン番号なしの URL で読めるようにする -->
+        <dependency>
+            <groupId>org.webjars</groupId>
+            <artifactId>webjars-locator-lite</artifactId>
         </dependency>
 
         <!-- 開発用（保存すると自動で再起動する） -->
