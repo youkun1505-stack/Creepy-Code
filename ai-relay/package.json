@@ -1,0 +1,18 @@
+{
+  "name": "ai-relay",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "bridal-app の AI 用中継プログラム（Sign in with ChatGPT）",
+  "scripts": {
+    "setup": "node setup.mjs",
+    "sign-in": "node relay.mjs sign-in",
+    "sign-out": "node relay.mjs sign-out",
+    "status": "node relay.mjs status",
+    "models": "node relay.mjs models",
+    "start": "node relay.mjs serve"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}
