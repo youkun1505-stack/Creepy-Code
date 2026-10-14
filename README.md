@@ -7,21 +7,22 @@ AIブライダルプランニング支援システム（P2C：Creepy Code）の�
 ## 使っている技術
 
 - Java 17 / Spring Boot 3.5 / Maven
-- Spring Data JPA / Oracle Database XE（各自の PC の Docker 上）
+- Spring Data JPA / Supabase（PostgreSQL。チーム全員で1つのプロジェクトを共有）
 - Thymeleaf ＋ Thymeleaf Layout Dialect ＋ Bootstrap 5
 - Spring Security（フォーム認証・BCrypt）
 - Gemini API（無料枠。初期状態はダミーモード）
 
-開発・発表はすべてローカル環境で行います（AWS は使いません）。
+アプリは各自の PC（ローカル環境）で動かし、データベースだけインターネット上の Supabase を使います（AWS は使いません）。
+データベースの接続情報は環境変数で渡し、このリポジトリには書きません（公開リポジトリのため）。
 
 ## フォルダ構成
 
 ```
 Creepy-Code/
 ├─ bridal-app/        … アプリ本体（Eclipse で「既存 Maven プロジェクト」として読み込む）
-├─ db/                … SQL Developer で実行する SQL
-│   ├─ 00_create_user.sql   … CREEPY ユーザー（スキーマ）の作成（SYSTEM で実行）
-│   └─ 保留/                … テーブル作成などの SQL（今は実行しない）
+├─ db/                … Supabase の SQL Editor で実行する SQL（管理担当が実行）
+│   ├─ 00〜03_*.sql         … スキーマ・テーブル・仮データ・テストユーザーの作成（共有DBで実行済み）
+│   └─ 保留/                … 全テーブル削除の SQL（ふだんは実行しない）
 └─ docs/
     ├─ 00_ブライダル業界/   … 業界調査・基本設計書など
     ├─ 01_テンプレート/
