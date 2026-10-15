@@ -92,6 +92,8 @@ $RECYCLE.BIN/
 # --- Claude Code 設定（個人設定は共有しない。AIハーネスの共有設定だけ Git に入れる） ---
 .claude/*
 !.claude/agents/
+!.claude/skills/
+!.claude/hooks/
 !.claude/settings.json
 !.claude/CLAUDE.md
 

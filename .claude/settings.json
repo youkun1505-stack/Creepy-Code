@@ -129,6 +129,18 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PROJECT_DIR}/.claude/hooks/test-bridal-app.sh\"",
+            "timeout": 300,
+            "statusMessage": "bridal-app のテストを実行しています"
+          }
+        ]
+      }
     ]
   }
 }

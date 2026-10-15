@@ -1,0 +1,2 @@
+# フックは sh で動くため、Windows でも改行を LF のままにする（CRLF だと動かない）
+* text eol=lf
