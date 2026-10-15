@@ -65,7 +65,7 @@ bridal-app（Java・8080番） → ai-relay（Node.js・8787番） → OpenAI
 |---|---|---|
 | `AI_RELAY_PORT` | `8787` | 中継プログラムのポート番号 |
 | `AI_RELAY_SIGN_IN_PORT` | `8788` | サインインのとき、ブラウザから戻ってくる先のポート番号 |
-| `AI_RELAY_MODEL` | `gpt-5.6-luna` | 使うモデル名。使えるモデルは `npm run models` で確認できる |
+| `AI_RELAY_MODEL` | `gpt-6-luna` | 使うモデル名。使えるモデルは `npm run models` で確認できる |
 | `CREEPY_CODE_HOME` | `C:\Users\<ユーザー名>\.creepy-code` | DevKit とサインイン情報の保存場所 |
 
 ## 守ること

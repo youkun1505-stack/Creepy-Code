@@ -20,7 +20,7 @@ const PORT = Number(process.env.AI_RELAY_PORT ?? 8787);
 // サインインのとき、ブラウザから戻ってくる先のポート番号
 const SIGN_IN_PORT = Number(process.env.AI_RELAY_SIGN_IN_PORT ?? 8788);
 // 使うモデル。開発中に利用枠を使いすぎないよう、軽いモデルを初期値にしている
-const DEFAULT_MODEL = process.env.AI_RELAY_MODEL ?? 'gpt-5.6-luna';
+const DEFAULT_MODEL = process.env.AI_RELAY_MODEL ?? 'gpt-6-luna';
 // 1回のリクエストで受け取る本文の上限
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
 
