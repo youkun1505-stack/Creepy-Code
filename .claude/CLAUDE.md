@@ -63,7 +63,7 @@ PR を作ったら、`.ai-tmp/<ブランチ名>/` をまるごと削除する。
 | 仕組み | 場所 | 止めるもの |
 | --- | --- | --- |
 | Git のフック | `.githooks/` | `main` へのコミット、`main`・`develop` への送信、feature/・fix/・docs/ で始まらない作業ブランチの送信、強制送信、GitHub のブランチ削除 |
-| Claude Code のフック | `.claude/settings.json` の `hooks` | 開いたときに Git のフックを有効にする。`main`・`develop`・`release/*`・`hotfix/*` の上でのファイル変更 |
+| Claude Code のフック | `.claude/settings.json` の `hooks` | 開いたときに Git のフックを有効にする。`main`・`develop`・`release/*`・`hotfix/*` の上でのファイル変更。返事を終える前に、`bridal-app/src` に変更があればテストを実行し、失敗したら差し戻す（`.claude/hooks/test-bridal-app.sh`） |
 | 許可の設定 | `.claude/settings.json` の `permissions` | 取り込み・`reset --hard`・`--no-verify` などのコマンド。送信と PR 作成は毎回メンバーに確認 |
 
 フックや設定で止められたら、理由をメンバーに伝え、AGENTS.md の Git のルールに沿って直す。止められなかった場合でも、ルールは必ず守る。
