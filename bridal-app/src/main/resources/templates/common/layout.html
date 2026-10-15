@@ -7,13 +7,27 @@
     <meta name="_csrf" th:if="${_csrf}" th:content="${_csrf.token}">
     <meta name="_csrf_header" th:if="${_csrf}" th:content="${_csrf.headerName}">
     <title layout:title-pattern="$CONTENT_TITLE | $LAYOUT_TITLE">AIブライダルプランニング</title>
+    <!-- 全画面共通のフォント（見出し：Zen Old Mincho／本文：Zen Kaku Gothic New）。使う太さだけ読み込む -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700&family=Zen+Old+Mincho:wght@700&display=swap">
     <link rel="stylesheet" th:href="@{/webjars/bootstrap/css/bootstrap.min.css}">
     <link rel="stylesheet" th:href="@{/css/common.css}">
 </head>
 <body>
     <header class="site-header">
-        <div class="container">
-            <span class="site-header__title">AIブライダルプランニング</span>
+        <div class="container site-header__inner">
+            <a class="site-header__title" th:href="@{/}">AIブライダルプランニング</a>
+            <!-- ログイン中だけ：会員名とログアウト（Controller が memberName を渡した画面だけ出る） -->
+            <!-- TODO: ログイン機能ができたら、memberName ではなくログイン情報（sec:authorize など）で出し分け、全画面に出す（Claude） -->
+            <div class="site-header__member" th:if="${memberName != null}">
+                <span class="site-header__name"><span th:text="${memberName}">テスト 顧客</span> 様</span>
+                <!-- ログアウトは Spring Security の作法に合わせて POST で送る（CSRF の値は th:action が自動で付ける） -->
+                <form class="site-header__logout" th:action="@{/logout}" method="post">
+                    <button type="submit" class="site-logout">ログアウト</button>
+                </form>
+            </div>
         </div>
     </header>
 
