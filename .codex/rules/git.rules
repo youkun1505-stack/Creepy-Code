@@ -2,11 +2,19 @@
 # Claude Code では .claude/settings.json の permissions が同じ役目。確実に止めるのは .githooks/ のフック。
 
 prefix_rule(
-    pattern = ["git", ["merge", "rebase", "clean", "config"]],
+    pattern = ["git", ["rebase", "clean", "config"]],
     decision = "forbidden",
-    justification = "取り込み・付け替え・clean・git config の変更は AI にさせない決まりです（AGENTS.md の 5）",
-    match = ["git merge develop", "git rebase develop", "git clean -fd", "git config user.name x"],
+    justification = "付け替え・clean・git config の変更は AI にさせない決まりです（AGENTS.md の 5）",
+    match = ["git rebase develop", "git clean -fd", "git config user.name x"],
     not_match = ["git status"],
+)
+
+prefix_rule(
+    pattern = ["git", "merge"],
+    decision = "prompt",
+    justification = "取り込みは、自分の作業ブランチに origin/develop を取り込むときだけ、メンバーの「はい」をもらって行います（AGENTS.md の 5）",
+    match = ["git merge origin/develop", "git merge --abort"],
+    not_match = ["git merge-tree --write-tree origin/develop HEAD"],
 )
 
 prefix_rule(
