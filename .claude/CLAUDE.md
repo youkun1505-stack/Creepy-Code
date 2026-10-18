@@ -84,12 +84,23 @@
 PR の本文には、作業メモの目的・機能ごとの結果・確認できていない点を書く。取り込みは人が行う。
 PR を作ったら、`.ai-tmp/<ブランチ名>/` をまるごと削除する。
 
+### 最新の develop を取り込むとき
+
+PR が `develop` と衝突したとき、または `develop` の新しい変更が必要なときだけ、AGENTS.md の「5. Git のルール」の条件で行う。
+
+1. `git branch --show-current` で自分の作業ブランチの上にいること、`git status --short` で未コミットの変更がないことを確かめる。
+2. `git fetch` のあと、`git merge-tree --write-tree --name-only origin/develop HEAD` で、衝突するファイルを先に調べる。
+3. 取り込む理由と衝突しそうなファイルをメンバーに見せ、「はい」をもらってから `git merge origin/develop` を実行する。
+4. 衝突したら、ファイルごとに「このブランチの内容」と「develop の内容」を見せ、どう残すかをメンバーに決めてもらう。
+   決まった内容で書き直し、`git add` と `git commit` で取り込みを終える。途中でやめるときは `git merge --abort`。
+5. `bridal-app` に変更があればテストを実行し、結果を報告する。送信はいつもどおり「はい」をもらってから行う。
+
 ## 守りの仕組みについて
 
 | 仕組み | 場所 | 止めるもの |
 | --- | --- | --- |
 | Git のフック | `.githooks/` | `main` へのコミット、`main`・`develop` への送信、feature/・fix/・docs/ で始まらない作業ブランチの送信、強制送信、GitHub のブランチ削除 |
 | Claude Code のフック | `.claude/settings.json` の `hooks` | 開いたときに Git のフックを有効にする。`main`・`develop`・`release/*`・`hotfix/*` の上でのファイル変更。返事を終える前に、`bridal-app/src` に変更があればテストを実行し、失敗したら差し戻す（`.claude/hooks/test-bridal-app.sh`） |
-| 許可の設定 | `.claude/settings.json` の `permissions` | 取り込み・`reset --hard`・`--no-verify` などのコマンド。送信と PR 作成は毎回メンバーに確認 |
+| 許可の設定 | `.claude/settings.json` の `permissions` | 付け替え・`reset --hard`・`--no-verify`・PR の取り込みなどのコマンド。送信・PR 作成・`develop` の取り込みは毎回メンバーに確認 |
 
 フックや設定で止められたら、理由をメンバーに伝え、AGENTS.md の Git のルールに沿って直す。止められなかった場合でも、ルールは必ず守る。

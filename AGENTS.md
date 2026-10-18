@@ -88,8 +88,16 @@ Codex はこのファイルを直接読みます。Claude Code は `.claude/CLAU
   `release/*`・`hotfix/*` は人が作る。
 - **`main` と `develop` へは直接送信しない。** 取り込みは必ず `develop` 向けの PR で、取り込むのは人。
 - 送信（push）と PR 作成は、内容を見せてメンバーの「はい」をもらってから、自分の作業ブランチだけ行う。
-- 禁止：強制送信（`--force`）、取り込み（`merge`）・付け替え（`rebase`）、`reset --hard`、`clean`、
-  ブランチ削除、`git config` の変更、`--no-verify`。
+- 最新の `develop` を自分の作業ブランチに取り込む（`merge`）ことだけは、次の条件を守れば行ってよい。
+  PR が `develop` と衝突したときや、`develop` の新しい変更が必要なときに使う。
+  - 自分の作業ブランチ（`feature/`・`fix/`・`docs/`）の上だけで行う。取り込むのは `origin/develop` だけ
+    （`git fetch` のあとに `git merge origin/develop`）。`main`・`develop`・`release/*`・`hotfix/*` の上では行わない。
+  - 取り込む前に、まだコミットしていない変更がないことを確かめ、メンバーに「はい」をもらう。
+  - 衝突したら、自分の判断で解消しない。衝突したファイルと両方の内容をメンバーに見せ、どう残すかを決めてもらう。
+    やめるときは `git merge --abort` で取り込む前に戻す。
+  - 解消したら、`bridal-app` に変更があればテスト（`mvnw.cmd -q test`）を実行し、結果を報告してから送信する。
+- 禁止：強制送信（`--force`）、上の条件に合わない取り込み（`merge`）、付け替え（`rebase`）、`reset --hard`、`clean`、
+  ブランチ削除、`git config` の変更、`--no-verify`、PR の取り込み（`gh pr merge`）。
 - コミットメッセージは `feat:`・`fix:`・`docs:`・`style:`・`refactor:`・`test:`・`chore:` で始め、日本語で書く。
   AI が関わったコミットは、最後の行に `Co-authored-by: Claude <noreply@anthropic.com>` を付ける（Codex なら Codex の名前）。
 - コミットの作者はメンバー本人のまま（Git の名前を変えない）。
