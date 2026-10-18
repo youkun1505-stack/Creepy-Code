@@ -2,7 +2,7 @@
 name: implementer
 description: Creepy Code の実装役。司会役から作業メモ（.ai-tmp/.../task.md）の機能番号と、直すチケットのパスを受け取り、その1機能だけを実装・修正する。レビューや Git 操作はしない。
 tools: Read, Edit, Write, Glob, Grep, Bash, Agent
-model: haiku
+model: claude-haiku-5-5
 effort: medium
 ---
 

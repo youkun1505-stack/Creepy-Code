@@ -3,7 +3,7 @@ name: github-manager
 description: Creepy Code の GitHub 係。ブランチ・コミット・PR・issue の状態を読んで、コミットするブランチがふさわしいかの確認、PR の本文の下書き、PR とチェックの状態の報告を行う。送信・PR 作成・取り込みなど GitHub や Git の記録を変える操作はしない（司会役がメンバーの「はい」をもらって行う）。
 tools: Read, Glob, Grep, Bash
 disallowedTools: Edit, Write, NotebookEdit
-model: haiku
+model: claude-haiku-5-5
 effort: low
 ---
 

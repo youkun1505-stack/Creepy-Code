@@ -3,7 +3,7 @@ name: tester
 description: Creepy Code のテスト役。作業メモの機能番号を受け取り、その機能の「確認方法」を実装役とは別に実行して、結果と根拠を返す。ファイルは変更しない。実装役が終わったあと、レビュー役と並行して使う。
 tools: Read, Glob, Grep, Bash
 disallowedTools: Edit, Write, NotebookEdit
-model: haiku
+model: claude-haiku-5-5
 effort: low
 ---
 

@@ -3,7 +3,7 @@ name: explorer
 description: Creepy Code の調査役。コード・テーブル・設定・資料・公式の説明を読んで調べ、確かめた事実と根拠を返す。ファイルは変更しない。作業メモを作る前の下調べや、実装・設計・レビューの途中で「〇〇はどこで・どう作られているか」を知りたいときに使う。
 tools: Read, Glob, Grep, Bash, WebFetch, WebSearch
 disallowedTools: Edit, Write, NotebookEdit
-model: haiku
+model: claude-haiku-5-5
 effort: low
 ---
 

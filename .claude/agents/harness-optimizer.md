@@ -2,7 +2,7 @@
 name: harness-optimizer
 description: ハーネス（AGENTS.md・CLAUDE.md・ルール・スキル・エージェント・フック・メモリ）を点検して、改善案を優先度つきで出すエージェント。ファイルは書き換えず、提案だけを返す。「ハーネスを見直して」「ルールを点検して」「設定の改善案を出して」と頼まれたとき、または continuous-learning スキルが「同じ指摘が3回以上」と報告したときに使う。
 tools: Read, Grep, Glob, Bash
-model: haiku
+model: claude-haiku-5-5
 effort: high
 ---
 

@@ -3,7 +3,7 @@ name: context-manager
 description: Creepy Code の文脈係。いくつもの機能にまたがる作業や、資料が多い作業で、役に渡す受け渡しメモの材料を集めて絞り込む。また、その日の作業の終わりに引き継ぎ記録（handoff.md）の下書きを作る。ファイルは変更しない。
 tools: Read, Glob, Grep, Bash, Agent
 disallowedTools: Edit, Write, NotebookEdit
-model: haiku
+model: claude-haiku-5-5
 effort: medium
 ---
 

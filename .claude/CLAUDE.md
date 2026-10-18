@@ -17,18 +17,20 @@
 
 | サブエージェント | 定義ファイル | モデル／推論の強さ | 使える道具 | 呼んでよい役 |
 | --- | --- | --- | --- | --- |
-| （司会役＝メインの会話） | `.claude/settings.json` の `model`・`effortLevel` | opus／medium | すべて（権限の設定に従う） | すべて |
-| `explorer`（調査役） | `.claude/agents/explorer.md` | haiku／low | 読む・調べる（変更しない） | なし |
-| `architect`（設計役） | `.claude/agents/architect.md` | sonnet／high | 読む（変更しない） | explorer |
-| `implementer`（実装役） | `.claude/agents/implementer.md` | haiku／medium | 読む・書く・決めたテストの実行 | explorer |
-| `tester`（テスト役） | `.claude/agents/tester.md` | haiku／low | 読む・決めたテストの実行（変更しない） | なし |
-| `reviewer`（レビュー役） | `.claude/agents/reviewer.md` | sonnet／high | 読む・`git diff` などの確認（変更しない） | explorer・tester |
-| `github-manager`（GitHub 係） | `.claude/agents/github-manager.md` | haiku／low | 読む・`git`／`gh` の読むだけの操作 | なし |
-| `memory-manager`（記録係） | `.claude/agents/memory-manager.md` | haiku／medium | 読む・`.agent-memory/` だけ書く | なし |
-| `context-manager`（文脈係） | `.claude/agents/context-manager.md` | haiku／medium | 読む（変更しない） | explorer |
-| `harness-optimizer`（ハーネス点検） | `.claude/agents/harness-optimizer.md` | haiku／high | 読む（変更しない） | なし |
+| （司会役＝メインの会話） | `.claude/settings.json` の `model`・`effortLevel` | claude-opus-5-5／medium | すべて（権限の設定に従う） | すべて |
+| `explorer`（調査役） | `.claude/agents/explorer.md` | claude-haiku-5-5／low | 読む・調べる（変更しない） | なし |
+| `architect`（設計役） | `.claude/agents/architect.md` | claude-sonnet-5-5／high | 読む（変更しない） | explorer |
+| `implementer`（実装役） | `.claude/agents/implementer.md` | claude-haiku-5-5／medium | 読む・書く・決めたテストの実行 | explorer |
+| `tester`（テスト役） | `.claude/agents/tester.md` | claude-haiku-5-5／low | 読む・決めたテストの実行（変更しない） | なし |
+| `reviewer`（レビュー役） | `.claude/agents/reviewer.md` | claude-sonnet-5-5／high | 読む・`git diff` などの確認（変更しない） | explorer・tester |
+| `github-manager`（GitHub 係） | `.claude/agents/github-manager.md` | claude-haiku-5-5／low | 読む・`git`／`gh` の読むだけの操作 | なし |
+| `memory-manager`（記録係） | `.claude/agents/memory-manager.md` | claude-haiku-5-5／medium | 読む・`.agent-memory/` だけ書く | なし |
+| `context-manager`（文脈係） | `.claude/agents/context-manager.md` | claude-haiku-5-5／medium | 読む（変更しない） | explorer |
+| `harness-optimizer`（ハーネス点検） | `.claude/agents/harness-optimizer.md` | claude-haiku-5-5／high | 読む（変更しない） | なし |
 
-- モデルは、司会役が Opus 5.5、設計役・レビュー役が Sonnet 5.5、ほかの役が Haiku 5.5（`opus`・`sonnet` は 5.5 で動くことを確認済み。`haiku` が Haiku 5.5 を指すかは、ハーネス検証記録で未確認）。
+- モデルは、司会役が Opus 5.5、設計役・レビュー役が Sonnet 5.5、ほかの役が Haiku 5.5。定義ファイルと `settings.json` には正式な名前（`claude-opus-5-5`・`claude-sonnet-5-5`・`claude-haiku-5-5`）で書き、
+  新しいモデルが出ても勝手に変わらないようにしている。略した名前（`opus`・`sonnet`・`haiku`）も、`settings.json` の `env`
+  （`ANTHROPIC_DEFAULT_OPUS_MODEL` など）で 5.5 に固定している（公式の説明ではそうなる。実際に効くかは、ハーネス検証記録で未確認）。モデルを新しくするときは、この3か所をリーダーがそろえて書き換える。
   推論の強さは、決まった手順の短い作業が `low`、ふつうの作業が `medium`、長い作業・厳しく守らせたい作業が `high`。
 - モデルを変えたいときは、定義ファイルの `model:`・`effort:`、司会役は `.claude/settings.json` の `model`・`effortLevel` を書き換える（リーダーが行う）。
   自分だけ変えたいときは `.claude/settings.local.json` に書く。
@@ -57,7 +59,7 @@ Haiku 5.5 の役（調査役・実装役・テスト役・GitHub 係・記録係
    - 役が `止まった` か `失敗` と報告し、理由が「難しかった点」（情報や権限が足りないのではない）
    - 実装役の同じチケットが1回 `再発` した
    - 報告の根拠が足りない、または受け渡しメモの返し方を守れていない
-2. **Sonnet 5.5 で呼び直す**：同じ役を、Agent ツールの `model` に `sonnet` を指定して呼び直す。受け渡しメモには、前の報告の「難しかった点」と、
+2. **Sonnet 5.5 で呼び直す**：同じ役を、Agent ツールの `model` に `sonnet` を指定して呼び直す（`env` の固定で Sonnet 5.5 になるはず。実際の動作は未確認）。受け渡しメモには、前の報告の「難しかった点」と、
    すでに分かったこと（確かめた事実だけ）を足す。レビュー役・テスト役へは、今までどおり実装役の報告文を渡さない。
 3. **司会役へのエスカレーション**：Sonnet 5.5 でも終えられなければ、それ以上は上げない。司会役が自分で状況を確かめ、
    進め方を変える案（機能の分け方・受け入れ条件・範囲など）を作ってメンバーに理由と一緒に見せ、「はい」をもらってから進める。

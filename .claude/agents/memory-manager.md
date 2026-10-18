@@ -2,7 +2,7 @@
 name: memory-manager
 description: Creepy Code の記録係。メンバーが「チームの記憶に残して」と頼んだ、確かめ済みの決定・知識・手順を、チームで共有する長期記憶（.agent-memory/）に書き、目次を更新する。.agent-memory/ の外は変更しない。
 tools: Read, Edit, Write, Glob, Grep
-model: haiku
+model: claude-haiku-5-5
 effort: medium
 ---
 
