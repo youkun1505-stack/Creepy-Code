@@ -18,16 +18,18 @@
 | サブエージェント | 定義ファイル | モデル／推論の強さ | 使える道具 | 呼んでよい役 |
 | --- | --- | --- | --- | --- |
 | （司会役＝メインの会話） | `.claude/settings.json` の `model`・`effortLevel` | opus／medium | すべて（権限の設定に従う） | すべて |
-| `explorer`（調査役） | `.claude/agents/explorer.md` | sonnet／low | 読む・調べる（変更しない） | なし |
-| `architect`（設計役） | `.claude/agents/architect.md` | opus／high | 読む（変更しない） | explorer |
-| `implementer`（実装役） | `.claude/agents/implementer.md` | sonnet／medium | 読む・書く・決めたテストの実行 | explorer |
-| `tester`（テスト役） | `.claude/agents/tester.md` | sonnet／low | 読む・決めたテストの実行（変更しない） | なし |
-| `reviewer`（レビュー役） | `.claude/agents/reviewer.md` | opus／high | 読む・`git diff` などの確認（変更しない） | explorer・tester |
-| `github-manager`（GitHub 係） | `.claude/agents/github-manager.md` | sonnet／low | 読む・`git`／`gh` の読むだけの操作 | なし |
-| `memory-manager`（記録係） | `.claude/agents/memory-manager.md` | sonnet／medium | 読む・`.agent-memory/` だけ書く | なし |
-| `context-manager`（文脈係） | `.claude/agents/context-manager.md` | sonnet／medium | 読む（変更しない） | explorer |
-| `harness-optimizer`（ハーネス点検） | `.claude/agents/harness-optimizer.md` | opus／high | 読む（変更しない） | なし |
+| `explorer`（調査役） | `.claude/agents/explorer.md` | haiku／low | 読む・調べる（変更しない） | なし |
+| `architect`（設計役） | `.claude/agents/architect.md` | sonnet／high | 読む（変更しない） | explorer |
+| `implementer`（実装役） | `.claude/agents/implementer.md` | haiku／medium | 読む・書く・決めたテストの実行 | explorer |
+| `tester`（テスト役） | `.claude/agents/tester.md` | haiku／low | 読む・決めたテストの実行（変更しない） | なし |
+| `reviewer`（レビュー役） | `.claude/agents/reviewer.md` | sonnet／high | 読む・`git diff` などの確認（変更しない） | explorer・tester |
+| `github-manager`（GitHub 係） | `.claude/agents/github-manager.md` | haiku／low | 読む・`git`／`gh` の読むだけの操作 | なし |
+| `memory-manager`（記録係） | `.claude/agents/memory-manager.md` | haiku／medium | 読む・`.agent-memory/` だけ書く | なし |
+| `context-manager`（文脈係） | `.claude/agents/context-manager.md` | haiku／medium | 読む（変更しない） | explorer |
+| `harness-optimizer`（ハーネス点検） | `.claude/agents/harness-optimizer.md` | haiku／high | 読む（変更しない） | なし |
 
+- モデルは、司会役が Opus 5.5、設計役・レビュー役が Sonnet 5.5、ほかの役が Haiku 5.5（`opus`・`sonnet` は 5.5 で動くことを確認済み。`haiku` が Haiku 5.5 を指すかは、ハーネス検証記録で未確認）。
+  推論の強さは、決まった手順の短い作業が `low`、ふつうの作業が `medium`、長い作業・厳しく守らせたい作業が `high`。
 - モデルを変えたいときは、定義ファイルの `model:`・`effort:`、司会役は `.claude/settings.json` の `model`・`effortLevel` を書き換える（リーダーが行う）。
   自分だけ変えたいときは `.claude/settings.local.json` に書く。
 - 同時に動くサブエージェントは5つまで（役の中から呼んだ役も数に入ると考えて数える）、呼び出しの深さは2段（司会役 → 役 → 調査役など）まで（`.claude/settings.json` の `env`）。
@@ -45,7 +47,29 @@
 - 互いに関係しない役は並行して呼んでよい（例：調査役を複数、テスト役とレビュー役）。同じファイルを書く役は、いつも1つだけにする。
 - 役の報告は、「状態」・根拠・変更したファイル・確かめていないことを見てから使う。報告どうしが食い違うとき、根拠が足りないときは、完了として扱わない。
 - 役が起動できない、または必要な結果が返らないときは、司会役が黙って代わりに作業しない。止まってメンバーに理由を伝える。
-  ただし、同時に動く数の上限で呼べなかっただけのときは、止まらずに1つずつ呼び直す。
+  ただし、同時に動く数の上限で呼べなかっただけのときは、止まらずに1つずつ呼び直す。下の「格上げ」に当たるときは、その手順に従う。
+
+### 格上げ（難しい作業を Sonnet 5.5 でやり直す）
+
+Haiku 5.5 の役（調査役・実装役・テスト役・GitHub 係・記録係・文脈係・ハーネス点検）が終えられなかったときは、司会役が次の順で上げる。
+
+1. **格上げする場面**：次のどれかに当たったとき。
+   - 役が `止まった` か `失敗` と報告し、理由が「難しかった点」（情報や権限が足りないのではない）
+   - 実装役の同じチケットが1回 `再発` した
+   - 報告の根拠が足りない、または受け渡しメモの返し方を守れていない
+2. **Sonnet 5.5 で呼び直す**：同じ役を、Agent ツールの `model` に `sonnet` を指定して呼び直す。受け渡しメモには、前の報告の「難しかった点」と、
+   すでに分かったこと（確かめた事実だけ）を足す。レビュー役・テスト役へは、今までどおり実装役の報告文を渡さない。
+3. **司会役へのエスカレーション**：Sonnet 5.5 でも終えられなければ、それ以上は上げない。司会役が自分で状況を確かめ、
+   進め方を変える案（機能の分け方・受け入れ条件・範囲など）を作ってメンバーに理由と一緒に見せ、「はい」をもらってから進める。
+   案が作れなければ、止まってメンバーに相談する。司会役が黙って役の代わりに実装やレビューをすることはしない（AGENTS.md の「3. 役割」）。
+
+- 格上げのとき、推論の強さは定義ファイルの `effort` のまま変えない（`model` だけを指定する）。
+  格上げした役は、その機能が終わるまで Sonnet 5.5 で呼ぶ。次の機能では、また定義ファイルのモデルに戻す。
+- 格上げは、権限・情報が足りない、受け入れ条件があいまい、などモデルを上げても直らない理由のときは行わない。そのときは止まってメンバーに相談する。
+- 格上げしても、「止まる条件」（1機能で直してはレビューする回数が3回を超えた、など）の数え方は変えない。
+- 格上げしたことは、メンバーへの報告に書く（どの役を、なぜ上げたか）。
+- 役の中から別の役を呼ぶときは、格上げしない。格上げは司会役だけが行う。
+  役の中から呼んだ役が `止まった` を返したら、呼んだ役はそれを自分の報告にそのまま書いて司会役に返す（格上げするかは司会役が決める）。
 
 ### 作業を始めるとき
 
@@ -102,7 +126,7 @@
 ### メンバーへの報告
 
 各機能が終わるたびに、短く報告する：変更したファイル、受け入れ条件の判定、繰り返した回数、
-直さずに終えた指摘（重さ「低」）、確認できていない点。報告は会話の中だけで行い、ファイルには残さない。
+格上げした役とその理由、直さずに終えた指摘（重さ「低」）、確認できていない点。報告は会話の中だけで行い、ファイルには残さない。
 
 ### 送信・PR
 

@@ -3,7 +3,7 @@ name: architect
 description: Creepy Code の設計役。作業の目的と範囲を受け取り、テーブル・Entity・Repository・Service・Controller・画面の分け方、受け入れ条件、変更してよい範囲、注意点を設計案として返す。ファイルは変更しない。作業メモ（task.md）を作る前、または機能の分け方に迷ったときに使う。
 tools: Read, Glob, Grep, Bash, Agent
 disallowedTools: Edit, Write, NotebookEdit
-model: opus
+model: sonnet
 effort: high
 ---
 

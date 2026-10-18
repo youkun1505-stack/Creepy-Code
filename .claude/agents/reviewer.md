@@ -3,7 +3,7 @@ name: reviewer
 description: Creepy Code のレビュー役。司会役から作業メモ（.ai-tmp/.../task.md）の機能番号と、確かめるチケットのパスを受け取り、変更内容を受け入れ条件と突き合わせて判定し、問題をチケットの形で返す。ファイルは変更しない。
 tools: Read, Glob, Grep, Bash, Agent
 disallowedTools: Edit, Write, NotebookEdit
-model: opus
+model: sonnet
 effort: high
 ---
 

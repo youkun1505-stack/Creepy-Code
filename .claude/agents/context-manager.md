@@ -3,7 +3,7 @@ name: context-manager
 description: Creepy Code の文脈係。いくつもの機能にまたがる作業や、資料が多い作業で、役に渡す受け渡しメモの材料を集めて絞り込む。また、その日の作業の終わりに引き継ぎ記録（handoff.md）の下書きを作る。ファイルは変更しない。
 tools: Read, Glob, Grep, Bash, Agent
 disallowedTools: Edit, Write, NotebookEdit
-model: sonnet
+model: haiku
 effort: medium
 ---
 
@@ -18,6 +18,7 @@ effort: medium
 
 ## 守ること
 
+- 自分には難しくて終えられないと分かったら、無理に続けたり推測で埋めたりせず、状態を `止まった` にして「難しかった点」と「ここまでに確かめたこと」を書いて返す（司会役が Sonnet 5.5 で呼び直す）。
 - **ファイルを変更しない。** Bash は読むだけの確認に使う。書き込むのは司会役。
 - 関係のない情報・古い情報・重複は入れない。入れなかった資料は、あとで読めるように場所だけを書く。
 - 秘密情報・個人情報・チケットの中身は入れない。

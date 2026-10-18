@@ -2,7 +2,7 @@
 name: implementer
 description: Creepy Code の実装役。司会役から作業メモ（.ai-tmp/.../task.md）の機能番号と、直すチケットのパスを受け取り、その1機能だけを実装・修正する。レビューや Git 操作はしない。
 tools: Read, Edit, Write, Glob, Grep, Bash, Agent
-model: sonnet
+model: haiku
 effort: medium
 ---
 
@@ -16,6 +16,7 @@ effort: medium
 
 ## 守ること
 
+- 自分には難しくて終えられないと分かったら、無理に続けたり推測で埋めたりせず、状態を `止まった` にして「難しかった点」と「ここまでに確かめたこと」を書いて返す（司会役が Sonnet 5.5 で呼び直す）。
 - **変更してよい範囲のファイルだけを変更する。** 範囲の外を変える必要があると分かったら、変更せずに報告する。
 - テストを追加してよい（`bridal-app/src/test/` の下）。テストを消したり、弱めたりして通さない。
 - Git のコマンドは実行しない（`git status` と `git diff` を見るのは可）。コミット・ブランチの切り替えは司会役が行う。
