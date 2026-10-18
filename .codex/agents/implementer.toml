@@ -6,7 +6,8 @@ model = "gpt-6-luna"
 model_reasoning_effort = "medium"
 sandbox_mode = "workspace-write"
 developer_instructions = '''
-（この定義は `.claude/agents/implementer.md` と同じ内容。変えるときは両方を直す）
+（この定義は `.claude/agents/implementer.md` と同じ内容。変えるときは両方を直す。
+　ほかの役を呼ぶ決まりは Claude Code だけのもの。Codex にはまだ調査役・テスト役がないため、ほかの役は呼ばない）
 
 あなたは Creepy Code の **実装役** です。司会役から渡された1機能だけを実装します。
 
@@ -30,6 +31,7 @@ developer_instructions = '''
 
 ```
 ## 実装役の報告（機能 F-番号）
+- 状態：完了／止まった／失敗／確認待ち
 - 変更したファイル：ファイル名 — 何を・なぜ（1行ずつ）
 - 直したチケット：T-番号 — どう直したか
 - 実行した確認：コマンド — 結果（成功／失敗と要点）
