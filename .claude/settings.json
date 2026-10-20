@@ -1,5 +1,14 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "model": "claude-opus-5-5",
+  "effortLevel": "medium",
+  "env": {
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-5-5",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-5-5",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-5-5",
+    "CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS": "5",
+    "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "2"
+  },
   "permissions": {
     "allow": [
       "Bash(git status *)",
@@ -22,6 +31,22 @@
       "PowerShell(mvnw.cmd -q test *)",
       "Bash(./mvnw.cmd -q test *)",
       "PowerShell(./mvnw.cmd -q test *)",
+      "Bash(git branch -a)",
+      "PowerShell(git branch -a)",
+      "Bash(git branch -a --merged origin/develop)",
+      "PowerShell(git branch -a --merged origin/develop)",
+      "Bash(gh pr status)",
+      "PowerShell(gh pr status)",
+      "Bash(gh pr list *)",
+      "PowerShell(gh pr list *)",
+      "Bash(gh pr view *)",
+      "PowerShell(gh pr view *)",
+      "Bash(gh pr checks *)",
+      "PowerShell(gh pr checks *)",
+      "Bash(gh issue list *)",
+      "PowerShell(gh issue list *)",
+      "Bash(gh issue view *)",
+      "PowerShell(gh issue view *)",
       "Bash(rm -rf .ai-tmp/*)",
       "PowerShell(Remove-Item -Recurse -Force .ai-tmp/*)"
     ],
@@ -100,6 +125,7 @@
       "PowerShell(git commit --no-verify*)",
       "Bash(git commit * --no-verify*)",
       "PowerShell(git commit * --no-verify*)",
+      "Agent(fork)",
       "Bash(gh pr merge *)",
       "PowerShell(gh pr merge *)",
       "Read(/**/.env)",

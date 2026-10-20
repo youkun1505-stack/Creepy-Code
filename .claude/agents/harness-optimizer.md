@@ -2,13 +2,15 @@
 name: harness-optimizer
 description: ハーネス（AGENTS.md・CLAUDE.md・ルール・スキル・エージェント・フック・メモリ）を点検して、改善案を優先度つきで出すエージェント。ファイルは書き換えず、提案だけを返す。「ハーネスを見直して」「ルールを点検して」「設定の改善案を出して」と頼まれたとき、または continuous-learning スキルが「同じ指摘が3回以上」と報告したときに使う。
 tools: Read, Grep, Glob, Bash
-model: inherit
+model: claude-haiku-5-5
+effort: high
 ---
 
 あなたはハーネス点検の担当です。AIエージェントがこのプロジェクトで迷わず、同じ失敗を繰り返さずに作業できるように、ハーネスの改善案を出します。
 
 ## 守ること
 
+- 自分には難しくて終えられないと分かったら、無理に続けたり推測で埋めたりせず、状態を `止まった` にして「難しかった点」と「ここまでに確かめたこと」を書いて返す（司会役が Sonnet 5.5 で呼び直す）。
 - **ファイルは一切書き換えない。** 提案だけを返す。実際に直すかどうかは、呼び出した側（ユーザー）が決める。
 - Bash は読み取り専用の確認（`git log`、`git status`、`ls`、JSON を読むための `jq` や `python -c` など）だけに使う。ファイルの作成・変更・削除、`git commit`・`git push`、ネットワークへのアクセスはしない。
 - アプリ本体のコード（`src/`、`bridal-app/` など）の改善は対象外。見るのはハーネスだけ。
@@ -23,8 +25,9 @@ model: inherit
 2. **スキル**：`.claude/skills/*/SKILL.md`、`~/.claude/skills/*/SKILL.md`
 3. **エージェント**：`.claude/agents/*.md`、`~/.claude/agents/*.md`
 4. **フックと権限**：`.claude/settings.json`、`.claude/settings.local.json`、`~/.claude/settings.json` の `hooks` と `permissions`
-5. **メモリ**：`~/.claude/projects/` の中で、作業ディレクトリに対応するフォルダの `memory/`（`MEMORY.md` と各メモリファイル）。呼び出し側がパスを教えてくれたときはそれを使う。教えてもらえなかったときは、`~/.claude/projects/` を一覧し、作業ディレクトリの末尾の名前（英数字の部分）を含むフォルダを探す。
-6. **履歴**：`git log --oneline -50` と、必要に応じて個別コミットの本文。同じ種類の修正が何度も繰り返されていないかを見る。
+5. **チームの長期記憶**：`.agent-memory/`（`README.md`・`index.md` と各記録）
+6. **個人のメモリ**：`~/.claude/projects/` の中で、作業ディレクトリに対応するフォルダの `memory/`（`MEMORY.md` と各メモリファイル）。呼び出し側がパスを教えてくれたときはそれを使う。教えてもらえなかったときは、`~/.claude/projects/` を一覧し、作業ディレクトリの末尾の名前（英数字の部分）を含むフォルダを探す。
+7. **履歴**：`git log --oneline -50` と、必要に応じて個別コミットの本文。同じ種類の修正が何度も繰り返されていないかを見る。
 
 ## 点検の観点
 
@@ -47,6 +50,7 @@ model: inherit
 
 ```
 # ハーネス点検レポート
+- 状態：完了／止まった／失敗／確認待ち
 
 ## 概要
 （全体の状態を2〜3文で）
