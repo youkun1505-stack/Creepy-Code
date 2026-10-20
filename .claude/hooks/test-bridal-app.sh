@@ -3,6 +3,7 @@
 # - bridal-app/src に変更（未コミット）が無いときは何もしない
 # - 前回テストが通ったときから変更が増えていなければ、もう一度は実行しない
 # - テストが失敗したら終了コード 2 を返し、Claude に差し戻して直させる
+# テストの実行と「通った」印の管理は、run-bridal-app-test.sh と共通にしている。
 
 input=$(cat)
 
@@ -18,18 +19,19 @@ if [ -z "$(git status --porcelain -- src)" ]; then
   exit 0
 fi
 
-# 今の変更内容の指紋。前回テストが通ったときと同じならスキップする
-hash=$( { git diff HEAD -- src; git ls-files -o --exclude-standard -z -- src | xargs -0 -r cat; } | sha1sum | cut -c1-40)
+# 今の変更内容の指紋を、共通の命令から得る。前回テストが通ったときと同じならスキップする
+run="$root/.claude/hooks/run-bridal-app-test.sh"
+hash=$(sh "$run" --fingerprint)
 stamp="$root/.claude/.last-test-pass"
 if [ -f "$stamp" ] && [ "$(cat "$stamp")" = "$hash" ]; then
   exit 0
 fi
 
-if out=$(sh ./mvnw -q test 2>&1); then
-  echo "$hash" > "$stamp"
+# 通ったときは、共通の命令が印を書く。失敗したときは、印を消して差し戻す
+if out=$(sh "$run" 2>&1); then
   exit 0
 fi
 
-echo "bridal-app のテストが失敗しました。原因を直してから作業を終えてください。" >&2
-printf '%s\n' "$out" | tail -n 60 >&2
+printf '%s\n' "$out" >&2
+echo "原因を直してから作業を終えてください。" >&2
 exit 2

@@ -31,6 +31,8 @@
       "PowerShell(mvnw.cmd -q test *)",
       "Bash(./mvnw.cmd -q test *)",
       "PowerShell(./mvnw.cmd -q test *)",
+      "Bash(sh .claude/hooks/run-bridal-app-test.sh)",
+      "PowerShell(sh .claude/hooks/run-bridal-app-test.sh)",
       "Bash(git branch -a)",
       "PowerShell(git branch -a)",
       "Bash(git branch -a --merged origin/develop)",
