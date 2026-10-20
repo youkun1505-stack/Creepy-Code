@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ja" xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{common/layout}">
+<head>
+    <!-- タブ名：未ログインは「トップページ」、ログイン後は「ホーム」 -->
+    <title th:text="${loggedIn} ? 'ホーム' : 'トップページ'">トップページ</title>
+    <link rel="stylesheet" th:href="@{/css/top.css}">
+</head>
+<body>
+    <main layout:fragment="content" class="container top-page">
+        <div class="top-page__grid" th:classappend="${loggedIn} ? 'is-member'">
+
+            <!-- 左：今の流行（中身は検討中のため、いまは枠だけ） -->
+            <aside class="top-trend" id="trend" aria-labelledby="trendTitle">
+                <h2 class="top-trend__title" id="trendTitle">今の流行</h2>
+                <p class="top-trend__note">準備中です。もうしばらくお待ちください。</p>
+                <ul class="top-trend__list">
+                    <li class="top-trend__card">準備中</li>
+                    <li class="top-trend__card">準備中</li>
+                    <li class="top-trend__card">準備中</li>
+                    <li class="top-trend__card">準備中</li>
+                    <li class="top-trend__card">準備中</li>
+                    <li class="top-trend__card">準備中</li>
+                </ul>
+            </aside>
+
+            <!-- 中央（未ログイン）：サービスの説明・ご利用の流れ -->
+            <div class="top-body" th:unless="${loggedIn}">
+                <section class="top-hero" id="about" aria-labelledby="heroTitle">
+                    <p class="top-hero__eyebrow">結婚式の準備をはじめるふたりへ</p>
+                    <h1 class="top-hero__title" id="heroTitle">何から決めればいいか、<br>ここで整理できます</h1>
+                    <!-- 和文は改行がそのまま空白になるため、1段落を1行で書いている -->
+                    <p class="top-hero__lead">いくつかの質問に答えると、AIがふたりの希望をまとめて、結婚式プランのたたき台をつくります。</p>
+                    <p class="top-hero__lead">たたき台をもとに、プランナーとアプリの中で相談できます。費用の目安はプランを変えるたびにその場で変わるため、予算と見比べながら決められるのが特長です。</p>
+                    <div class="top-hero__rings" aria-hidden="true"></div>
+                </section>
+
+                <section class="top-flow" id="flow" aria-labelledby="flowTitle">
+                    <h2 class="top-section-title" id="flowTitle">ご利用の流れ</h2>
+                    <ol class="top-flow__list">
+                        <li class="top-flow__step">
+                            <span class="top-flow__number" aria-hidden="true">1</span>
+                            <div>
+                                <h3 class="top-flow__step-title">かんたんな質問に答える</h3>
+                                <p class="top-flow__text">「どんな式にしたい？」から始まり、雰囲気・人数・予算などを答えていきます。言葉にしにくい好みは、写真を選ぶだけで大丈夫です。</p>
+                            </div>
+                        </li>
+                        <li class="top-flow__step">
+                            <span class="top-flow__number" aria-hidden="true">2</span>
+                            <div>
+                                <h3 class="top-flow__step-title">AIがたたき台をつくる</h3>
+                                <p class="top-flow__text">AIが追加でいくつか質問し、ふたりが大事にしたいことを整理したうえで、プランのたたき台をつくります。AIへの相談は、ログインしたらいつでもできます。</p>
+                            </div>
+                        </li>
+                        <li class="top-flow__step">
+                            <span class="top-flow__number" aria-hidden="true">3</span>
+                            <div>
+                                <h3 class="top-flow__step-title">プランナーに相談する</h3>
+                                <p class="top-flow__text">たたき台と「大事にしたいこと」「削ってもいいこと」がプランナーに届くので、一から説明し直す必要はありません。担当が決まったら、チャットで相談できます。</p>
+                            </div>
+                        </li>
+                        <li class="top-flow__step">
+                            <span class="top-flow__number" aria-hidden="true">4</span>
+                            <div>
+                                <h3 class="top-flow__step-title">内容に合意する</h3>
+                                <p class="top-flow__text">チャットで調整を重ね、納得できた内容でプランを確定します。</p>
+                            </div>
+                        </li>
+                    </ol>
+                </section>
+            </div>
+
+            <!-- 中央（ログイン後）：次にやること・進み具合 -->
+            <!-- Controller から渡す値は record なので、${nextAction.title()} のようにメソッドの形で読んでいる -->
+            <div class="top-body" th:if="${loggedIn}">
+                <section class="top-next" aria-labelledby="nextTitle">
+                    <p class="top-hero__eyebrow" th:text="${greeting}">おかえりなさい</p>
+                    <p class="top-next__label">次にやること</p>
+                    <h1 class="top-next__title" id="nextTitle" th:text="${nextAction.title()}">次にやること</h1>
+                    <p class="top-next__text" th:text="${nextAction.text()}">説明</p>
+                    <a class="btn top-button top-button--primary" th:href="@{${nextAction.url()}}"
+                       th:text="${nextAction.buttonLabel()}">はじめる</a>
+                    <!-- TODO: 画面番号と URL の対応表が決まったら、P-10 の URL も Controller の定数（URL_DEEPDIVE）を Model で渡して使う形にそろえる（しょたこん） -->
+                    <p class="top-next__ai">迷ったときは、<a class="top-next__ai-link" th:href="@{/hearing/deepdive}">AIに相談する</a>こともできます。かんたん質問の途中でも使えます。</p>
+                    <div class="top-hero__rings" aria-hidden="true"></div>
+                </section>
+
+                <section class="top-progress" aria-labelledby="progressTitle">
+                    <h2 class="top-section-title" id="progressTitle">進み具合</h2>
+                    <ol class="top-progress__list">
+                        <li class="top-progress__step" th:each="step, stat : ${progressSteps}"
+                            th:classappend="${'is-' + step.status()}"
+                            th:attr="aria-current=${step.status() == 'current'} ? 'step' : null">
+                            <span class="top-progress__mark" aria-hidden="true" th:text="${stat.count}">1</span>
+                            <span class="top-progress__label" th:text="${step.label()}">かんたん質問</span>
+                            <span class="top-progress__state" th:if="${step.status() == 'done'}">済み</span>
+                            <span class="top-progress__state" th:if="${step.status() == 'current'}">いまここ</span>
+                        </li>
+                    </ol>
+                </section>
+            </div>
+
+            <!-- 右（未ログイン）：会員登録・ログイン。スクロールしても付いてくる -->
+            <nav class="top-menu" aria-label="トップページのメニュー" th:unless="${loggedIn}">
+                <div class="top-menu__group">
+                    <p class="top-menu__label">はじめての方</p>
+                    <!-- TODO: 会員登録（P-02）の URL が決まったら合わせる（しょたこん） -->
+                    <a class="btn top-button top-button--primary" th:href="@{/auth/register}">会員登録してはじめる</a>
+                </div>
+                <div class="top-menu__group">
+                    <p class="top-menu__label">会員の方</p>
+                    <!-- TODO: ログイン（P-03）の URL が決まったら合わせる（しょたこん） -->
+                    <a class="btn top-button top-button--secondary" th:href="@{/auth/login}">ログイン</a>
+                </div>
+                <ul class="top-menu__links">
+                    <li><a class="top-menu__link" href="#about">このサービスについて</a></li>
+                    <li><a class="top-menu__link" href="#flow">ご利用の流れ</a></li>
+                    <li><a class="top-menu__link" href="#trend">今の流行</a></li>
+                </ul>
+            </nav>
+
+            <!-- 右（ログイン後）：各画面へのメニュー。押せない項目は理由を下に出す -->
+            <nav class="top-menu" aria-label="メニュー" th:if="${loggedIn}">
+                <p class="top-menu__label">メニュー</p>
+                <ul class="top-hub">
+                    <li class="top-hub__item" th:each="item, stat : ${menuItems}">
+                        <a class="top-hub__link" th:if="${item.enabled()}" th:href="@{${item.url()}}"
+                           th:text="${item.label()}">メニュー</a>
+                        <span class="top-hub__link is-disabled" th:unless="${item.enabled()}" aria-disabled="true"
+                              th:attr="aria-describedby=${'hubNote' + stat.index}" th:text="${item.label()}">メニュー</span>
+                        <span class="top-hub__note" th:if="${item.note()}" th:id="${'hubNote' + stat.index}"
+                              th:text="${item.note()}">理由</span>
+                    </li>
+                </ul>
+            </nav>
+
+        </div>
+    </main>
+</body>
+</html>
