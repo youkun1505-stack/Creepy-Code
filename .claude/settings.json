@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "model": "claude-opus-5-5",
+  "effortLevel": "medium",
+  "env": {
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-5-5",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-5-5",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-5-5",
+    "CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS": "5",
+    "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "2"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git status *)",
+      "PowerShell(git status *)",
+      "Bash(git branch --show-current)",
+      "PowerShell(git branch --show-current)",
+      "Bash(git diff *)",
+      "PowerShell(git diff *)",
+      "Bash(git log *)",
+      "PowerShell(git log *)",
+      "Bash(git fetch *)",
+      "PowerShell(git fetch *)",
+      "Bash(git merge-tree *)",
+      "PowerShell(git merge-tree *)",
+      "Bash(git add *)",
+      "PowerShell(git add *)",
+      "Bash(git commit *)",
+      "PowerShell(git commit *)",
+      "Bash(mvnw.cmd -q test *)",
+      "PowerShell(mvnw.cmd -q test *)",
+      "Bash(./mvnw.cmd -q test *)",
+      "PowerShell(./mvnw.cmd -q test *)",
+      "Bash(git branch -a)",
+      "PowerShell(git branch -a)",
+      "Bash(git branch -a --merged origin/develop)",
+      "PowerShell(git branch -a --merged origin/develop)",
+      "Bash(gh pr status)",
+      "PowerShell(gh pr status)",
+      "Bash(gh pr list *)",
+      "PowerShell(gh pr list *)",
+      "Bash(gh pr view *)",
+      "PowerShell(gh pr view *)",
+      "Bash(gh pr checks *)",
+      "PowerShell(gh pr checks *)",
+      "Bash(gh issue list *)",
+      "PowerShell(gh issue list *)",
+      "Bash(gh issue view *)",
+      "PowerShell(gh issue view *)",
+      "Bash(rm -rf .ai-tmp/*)",
+      "PowerShell(Remove-Item -Recurse -Force .ai-tmp/*)"
+    ],
+    "ask": [
+      "Bash(git push *)",
+      "PowerShell(git push *)",
+      "Bash(git switch *)",
+      "PowerShell(git switch *)",
+      "Bash(git checkout *)",
+      "PowerShell(git checkout *)",
+      "Bash(git pull *)",
+      "PowerShell(git pull *)",
+      "Bash(git stash *)",
+      "PowerShell(git stash *)",
+      "Bash(git merge *)",
+      "PowerShell(git merge *)",
+      "Bash(gh pr create *)",
+      "PowerShell(gh pr create *)",
+      "Edit(/AGENTS.md)",
+      "Edit(/.claude/**)",
+      "Edit(/.codex/**)",
+      "Edit(/.githooks/**)",
+      "Edit(/.gitignore)",
+      "Edit(/.gitattributes)"
+    ],
+    "deny": [
+      "Bash(git push * main)",
+      "PowerShell(git push * main)",
+      "Bash(git push * main *)",
+      "PowerShell(git push * main *)",
+      "Bash(git push *:main)",
+      "PowerShell(git push *:main)",
+      "Bash(git push *:main *)",
+      "PowerShell(git push *:main *)",
+      "Bash(git push * develop)",
+      "PowerShell(git push * develop)",
+      "Bash(git push * develop *)",
+      "PowerShell(git push * develop *)",
+      "Bash(git push *:develop)",
+      "PowerShell(git push *:develop)",
+      "Bash(git push *:develop *)",
+      "PowerShell(git push *:develop *)",
+      "Bash(git push * release/*)",
+      "PowerShell(git push * release/*)",
+      "Bash(git push * hotfix/*)",
+      "PowerShell(git push * hotfix/*)",
+      "Bash(git push --force*)",
+      "PowerShell(git push --force*)",
+      "Bash(git push * --force*)",
+      "PowerShell(git push * --force*)",
+      "Bash(git push -f *)",
+      "PowerShell(git push -f *)",
+      "Bash(git push * -f *)",
+      "PowerShell(git push * -f *)",
+      "Bash(git push * -f)",
+      "PowerShell(git push * -f)",
+      "Bash(git push --delete *)",
+      "PowerShell(git push --delete *)",
+      "Bash(git push * --delete *)",
+      "PowerShell(git push * --delete *)",
+      "Bash(git rebase *)",
+      "PowerShell(git rebase *)",
+      "Bash(git reset --hard*)",
+      "PowerShell(git reset --hard*)",
+      "Bash(git clean *)",
+      "PowerShell(git clean *)",
+      "Bash(git branch -D *)",
+      "PowerShell(git branch -D *)",
+      "Bash(git branch -d *)",
+      "PowerShell(git branch -d *)",
+      "Bash(git branch --delete *)",
+      "PowerShell(git branch --delete *)",
+      "Bash(git config *)",
+      "PowerShell(git config *)",
+      "Bash(git commit --no-verify*)",
+      "PowerShell(git commit --no-verify*)",
+      "Bash(git commit * --no-verify*)",
+      "PowerShell(git commit * --no-verify*)",
+      "Agent(fork)",
+      "Bash(gh pr merge *)",
+      "PowerShell(gh pr merge *)",
+      "Read(/**/.env)",
+      "Read(/**/.env.*)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "git -C \"${CLAUDE_PROJECT_DIR}\" config core.hooksPath .githooks",
+            "timeout": 30,
+            "statusMessage": "Git のルール確認（.githooks）を有効にしています"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PROJECT_DIR}/.githooks/ai-guard.sh\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PROJECT_DIR}/.claude/hooks/test-bridal-app.sh\"",
+            "timeout": 300,
+            "statusMessage": "bridal-app のテストを実行しています"
+          }
+        ]
+      }
+    ]
+  }
+}
