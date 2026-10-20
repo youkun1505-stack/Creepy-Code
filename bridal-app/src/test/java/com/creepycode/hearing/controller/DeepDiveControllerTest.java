@@ -6,7 +6,6 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -33,7 +32,6 @@ import com.creepycode.common.exception.AiException;
 import com.creepycode.hearing.dto.AiChatMessageView;
 import com.creepycode.hearing.entity.AiChatMessage;
 import com.creepycode.hearing.service.AiChatService;
-import com.creepycode.hearing.service.DeepDiveService;
 
 /**
  * AI相談チャット（P-10）の Controller のテスト。DB は使わず、Service は偽物にする。
@@ -50,9 +48,6 @@ class DeepDiveControllerTest {
     @MockitoBean
     private AiChatService aiChatService;
 
-    @MockitoBean
-    private DeepDiveService deepDiveService;
-
     @BeforeEach
     void setUp() {
         // 既定では、相談の履歴は無い
@@ -60,7 +55,7 @@ class DeepDiveControllerTest {
     }
 
     @Test
-    void 表示のときは履歴を古い順に画面へ渡し_仮の回答を作らない() throws Exception {
+    void 表示のときは履歴を古い順に画面へ渡す() throws Exception {
         LocalDateTime time = LocalDateTime.of(2026, 10, 20, 10, 0);
         when(aiChatService.findHistory(1L)).thenReturn(List.of(
                 message(AiChatMessage.ROLE_USER, "式場の予約はいつ？", time),
@@ -73,9 +68,6 @@ class DeepDiveControllerTest {
                 .andExpect(model().attribute("chatMessages", contains(
                         new AiChatMessageView("USER", "式場の予約はいつ？", time),
                         new AiChatMessageView("AI", "半年前からが目安です。", time))));
-
-        // 仮の回答を作る処理（深掘り質問の Service）は呼ばない
-        verifyNoInteractions(deepDiveService);
     }
 
     @Test

@@ -26,7 +26,7 @@ import com.creepycode.hearing.repository.OnboardingAnswerRepository;
 public class AiChatService {
 
     /** 発言の長さの上限（字）。画面の入力欄も同じ上限にする。 */
-    static final int MAX_LENGTH = 1000;
+    public static final int MAX_LENGTH = 1000;
 
     private static final String INSTRUCTIONS = """
             あなたは結婚式場のプランナーの助手です。
@@ -111,7 +111,6 @@ public class AiChatService {
 
     /**
      * 事前ヒアリングの回答を、AI に渡す文章にする。
-     * DeepDiveService に同じ処理があるが、F-5 でそちらを片付けるまでは、この Service は独立させておく。
      */
     private String describeAnswer(OnboardingAnswer answer) {
         String archetype = answer.getArchetypeId() == null ? "まだイメージできない"
