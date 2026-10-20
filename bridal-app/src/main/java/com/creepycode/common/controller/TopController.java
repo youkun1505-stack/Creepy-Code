@@ -2,6 +2,7 @@ package com.creepycode.common.controller;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -17,7 +18,7 @@ public class TopController {
 
     private static final String VIEW = "common/top";
 
-    // TODO: 各画面ができたら、それぞれの本当の URL に合わせる（Claude）
+    // TODO: 各画面ができたら、それぞれの本当の URL に合わせる（しょたこん）
     private static final String URL_HEARING_STEP1 = "/hearing/step1";
     private static final String URL_HEARING_STEP2 = "/hearing/step2";
     private static final String URL_DEEPDIVE = "/hearing/deepdive";
@@ -45,9 +46,9 @@ public class TopController {
     /** トップページ（未ログイン版）を表示する。 */
     @GetMapping("/")
     public String show(Model model) {
-        // TODO: 「今の流行」の中身（取得元は検討中）が決まったら、ここで Model に入れて画面に渡す（Claude）
-        // TODO: ログイン機能（Spring Security）を入れるときは、「/」と /css/** をログインなしで見られるようにする（Claude）
-        // TODO: ログイン機能ができたら、ログイン中の顧客にはここでハブ（showAfterLoginTmp の内容）を出す（Claude）
+        // TODO: 「今の流行」の中身（取得元は検討中）が決まったら、ここで Model に入れて画面に渡す（しょたこん）
+        // TODO: ログイン機能（Spring Security）を入れるときは、「/」と /css/** をログインなしで見られるようにする（しょたこん）
+        // TODO: ログイン機能ができたら、ログイン中の顧客にはここでハブ（showAfterLoginTmp の内容）を出す（しょたこん）
         model.addAttribute("loggedIn", false);
         return VIEW;
     }
@@ -60,10 +61,10 @@ public class TopController {
     @GetMapping("/after-login-tmp")
     public String showAfterLoginTmp(@RequestParam(name = "state", defaultValue = "new") String state,
             Model model) {
-        // TODO: ログイン機能ができたら、この URL は削除し、状態はログイン中の顧客のプランから判定する（Claude）
+        // TODO: ログイン機能ができたら、この URL は削除し、状態はログイン中の顧客のプランから判定する（しょたこん）
         DemoState demoState = parseState(state);
         model.addAttribute("loggedIn", true);
-        // TODO: ログイン機能ができたら、ログイン中の顧客の USERS.NAME に置き換える（いまはテストデータの顧客の名前）（Claude）
+        // TODO: ログイン機能ができたら、ログイン中の顧客の USERS.NAME に置き換える（いまはテストデータの顧客の名前）（しょたこん）
         model.addAttribute("memberName", "テスト 顧客");
         model.addAttribute("greeting", demoState == DemoState.NEW ? "ようこそ" : "おかえりなさい");
         model.addAttribute("nextAction", buildNextAction(demoState));
@@ -75,7 +76,7 @@ public class TopController {
     /** 文字の状態名を DemoState に変える。知らない値のときは「ヒアリング途中」として扱う。 */
     private DemoState parseState(String state) {
         try {
-            return DemoState.valueOf(state.toUpperCase());
+            return DemoState.valueOf(state.toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
             return DemoState.HEARING;
         }
@@ -134,7 +135,7 @@ public class TopController {
         // プランナーとのチャットは、担当が決まるまで押せない。理由の文言は状態で2種類に分ける
         String chatNote = switch (state) {
             case NEW, HEARING, PLAN -> "マイプランで「プランナーに相談する」を選ぶと使えます";
-            // TODO: 推定待ち時間（基本設計書 5-2）の出し方が決まったら、文言に目安を足す（Claude）
+            // TODO: 推定待ち時間（基本設計書 5-2）の出し方が決まったら、文言に目安を足す（しょたこん）
             case ASSIGNING -> "担当プランナーを決めています。決まるとここから相談できます";
             case ASSIGNED -> null;
         };

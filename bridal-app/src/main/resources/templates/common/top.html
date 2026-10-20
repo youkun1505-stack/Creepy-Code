@@ -80,6 +80,7 @@
                     <p class="top-next__text" th:text="${nextAction.text()}">説明</p>
                     <a class="btn top-button top-button--primary" th:href="@{${nextAction.url()}}"
                        th:text="${nextAction.buttonLabel()}">はじめる</a>
+                    <!-- TODO: 画面番号と URL の対応表が決まったら、P-10 の URL も Controller の定数（URL_DEEPDIVE）を Model で渡して使う形にそろえる（しょたこん） -->
                     <p class="top-next__ai">迷ったときは、<a class="top-next__ai-link" th:href="@{/hearing/deepdive}">AIに相談する</a>こともできます。かんたん質問の途中でも使えます。</p>
                     <div class="top-hero__rings" aria-hidden="true"></div>
                 </section>
@@ -103,12 +104,12 @@
             <nav class="top-menu" aria-label="トップページのメニュー" th:unless="${loggedIn}">
                 <div class="top-menu__group">
                     <p class="top-menu__label">はじめての方</p>
-                    <!-- TODO: 会員登録（P-02）の URL が決まったら合わせる（Claude） -->
+                    <!-- TODO: 会員登録（P-02）の URL が決まったら合わせる（しょたこん） -->
                     <a class="btn top-button top-button--primary" th:href="@{/auth/register}">会員登録してはじめる</a>
                 </div>
                 <div class="top-menu__group">
                     <p class="top-menu__label">会員の方</p>
-                    <!-- TODO: ログイン（P-03）の URL が決まったら合わせる（Claude） -->
+                    <!-- TODO: ログイン（P-03）の URL が決まったら合わせる（しょたこん） -->
                     <a class="btn top-button top-button--secondary" th:href="@{/auth/login}">ログイン</a>
                 </div>
                 <ul class="top-menu__links">
