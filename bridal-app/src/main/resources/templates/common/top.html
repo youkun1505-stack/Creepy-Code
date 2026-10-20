@@ -26,6 +26,8 @@
 
             <!-- 中央（未ログイン）：サービスの説明・ご利用の流れ -->
             <div class="top-body" th:unless="${loggedIn}">
+                <!-- ほかの画面から戻ってきたときの案内。一度だけ出る（Controller のフラッシュ属性） -->
+                <p class="top-notice" role="status" th:if="${flashMessage}" th:text="${flashMessage}">お知らせ</p>
                 <section class="top-hero" id="about" aria-labelledby="heroTitle">
                     <p class="top-hero__eyebrow">結婚式の準備をはじめるふたりへ</p>
                     <h1 class="top-hero__title" id="heroTitle">何から決めればいいか、<br>ここで整理できます</h1>
@@ -73,6 +75,8 @@
             <!-- 中央（ログイン後）：次にやること・進み具合 -->
             <!-- Controller から渡す値は record なので、${nextAction.title()} のようにメソッドの形で読んでいる -->
             <div class="top-body" th:if="${loggedIn}">
+                <!-- 会員登録（P-02）の直後など、ほかの画面から来たときの案内。一度だけ出る（Controller のフラッシュ属性） -->
+                <p class="top-notice" role="status" th:if="${flashMessage}" th:text="${flashMessage}">会員登録が完了しました。まずはかんたんな質問からはじめましょう。</p>
                 <section class="top-next" aria-labelledby="nextTitle">
                     <p class="top-hero__eyebrow" th:text="${greeting}">おかえりなさい</p>
                     <p class="top-next__label">次にやること</p>
@@ -104,12 +108,10 @@
             <nav class="top-menu" aria-label="トップページのメニュー" th:unless="${loggedIn}">
                 <div class="top-menu__group">
                     <p class="top-menu__label">はじめての方</p>
-                    <!-- TODO: 会員登録（P-02）の URL が決まったら合わせる（しょたこん） -->
                     <a class="btn top-button top-button--primary" th:href="@{/auth/register}">会員登録してはじめる</a>
                 </div>
                 <div class="top-menu__group">
                     <p class="top-menu__label">会員の方</p>
-                    <!-- TODO: ログイン（P-03）の URL が決まったら合わせる（しょたこん） -->
                     <a class="btn top-button top-button--secondary" th:href="@{/auth/login}">ログイン</a>
                 </div>
                 <ul class="top-menu__links">

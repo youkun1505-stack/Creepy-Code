@@ -1,0 +1,479 @@
+/* Hallmark · macrostructure: 2列（説明｜フォーム）· tone: 上品＋親しみ · anchor hue: rose
+ * jp: genre=form density=low fonts=Zen Old Mincho（見出し）+Zen Kaku Gothic New（本文）※ フォントは common.css の共通設定を使う
+ */
+
+/* 会員登録（P-02）・ログイン（P-03）で共通のスタイル（どちらも「左：説明／右：フォーム」の同じ骨格） */
+/* 全画面共通の色・文字サイズは common.css の変数を使い、この2画面だけで使う値はここの変数にまとめる */
+/* アクセントの色は、トップページ（P-01）と同じ値にそろえている */
+.auth-page {
+    --auth-color-accent: #8a5a65;
+    --auth-color-accent-hover: #744a54;
+    --auth-color-accent-active: #5f3c45;
+    --auth-color-accent-soft: #f3e8ea;
+    --auth-color-placeholder: #d9c4c8;
+    --auth-color-rule: #eadcdf;
+    --auth-color-surface: #fffbfb;
+    /* エラーの赤は、白い背景の上でも読みやすい濃さ（Bootstrap の標準より少し濃い） */
+    --auth-color-error: #b02a37;
+    --auth-color-error-soft: #fbeaec;
+    --auth-focus-ring: 0 0 0 0.25rem rgba(138, 90, 101, 0.25);
+    --auth-focus-ring-error: 0 0 0 0.25rem rgba(176, 42, 55, 0.2);
+    --auth-shadow-card: 0 0.5rem 1.5rem rgba(138, 90, 101, 0.08);
+    --auth-font-size-heading: 1.5rem;
+    --auth-font-size-title: 2rem;
+    --auth-font-size-item-title: 1.0625rem;
+    --auth-form-width: 30rem;
+    --auth-radius: 1rem;
+}
+
+/* 飾りの輪が端からはみ出しても、横スクロールを出さない */
+html:has(.auth-page),
+body:has(.auth-page) {
+    overflow-x: clip;
+}
+
+main.auth-page {
+    padding-top: 2.5rem;
+    padding-bottom: 4rem;
+    font-size: 16px;
+    line-height: 1.8;
+    letter-spacing: 0.02em;
+    overflow-wrap: anywhere;
+    word-break: normal;
+    line-break: strict;
+}
+
+/* 和文と英数字の間に少しすき間を空ける */
+.auth-page p,
+.auth-page li {
+    text-autospace: normal;
+}
+
+.auth-page h1,
+.auth-page h2,
+.auth-page h3 {
+    line-height: 1.4;
+    letter-spacing: 0.02em;
+    font-feature-settings: "palt";
+    word-break: auto-phrase;
+    text-wrap: pretty;
+}
+
+/* 2列の並び（左：説明／右：フォーム） */
+.auth-page__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, var(--auth-form-width));
+    grid-template-areas: "guide card";
+    gap: 3.5rem;
+    align-items: start;
+}
+
+/* 左：登録するとできること・登録したあとの流れ。ページで唯一の色付きの面にする */
+.auth-guide {
+    grid-area: guide;
+    position: relative;
+    overflow: hidden;
+    padding: 2.75rem 2.5rem 3.5rem;
+    border-radius: var(--auth-radius);
+    background: linear-gradient(135deg, var(--auth-color-accent-soft), var(--color-background-sub));
+}
+
+.auth-guide > * {
+    position: relative;
+    z-index: 1;
+}
+
+.auth-guide__eyebrow {
+    margin-bottom: 0.5rem;
+    color: var(--auth-color-accent);
+    font-size: var(--font-size-small);
+    font-weight: 700;
+    letter-spacing: 0.1em;
+}
+
+.auth-guide__title {
+    margin-bottom: 1.25rem;
+    font-size: var(--auth-font-size-heading);
+}
+
+/* 登録するとできること */
+.auth-merit {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    margin: 0 0 2.75rem;
+    padding: 0;
+    list-style: none;
+}
+
+.auth-merit__item {
+    display: flex;
+    gap: 1rem;
+}
+
+/* 項目の頭の小さな輪（トップページの指輪の飾りと同じモチーフ） */
+.auth-merit__mark {
+    flex-shrink: 0;
+    width: 1.125rem;
+    height: 1.125rem;
+    margin-top: 0.3rem;
+    border: 2px solid var(--auth-color-accent);
+    border-radius: 50%;
+}
+
+.auth-merit__title {
+    margin-bottom: 0.25rem;
+    font-size: var(--auth-font-size-item-title);
+}
+
+.auth-merit__text {
+    max-width: 30em;
+    margin: 0;
+}
+
+/* 登録したあとの流れ。番号を縦の線でつなぐ（トップページの「ご利用の流れ」と同じ見せ方） */
+.auth-flow {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.auth-flow::before {
+    content: "";
+    position: absolute;
+    top: 1rem;
+    bottom: 1rem;
+    left: 1rem;
+    border-left: 1px solid var(--auth-color-placeholder);
+}
+
+.auth-flow__step {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.auth-flow__number {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border: 1px solid var(--auth-color-accent);
+    border-radius: 50%;
+    background-color: var(--auth-color-surface);
+    color: var(--auth-color-accent);
+    font-family: var(--font-heading);
+    font-weight: 700;
+}
+
+/* いまの段階だけ、番号を塗りつぶして目立たせる */
+.auth-flow__step.is-current .auth-flow__number {
+    background-color: var(--auth-color-accent);
+    color: var(--auth-color-surface);
+}
+
+.auth-flow__step.is-current .auth-flow__label {
+    font-weight: 700;
+}
+
+.auth-flow__state {
+    padding: 0 0.625rem;
+    border-radius: 999px;
+    background-color: var(--auth-color-accent);
+    color: var(--auth-color-surface);
+    font-size: var(--font-size-small);
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+/* 背景の飾り（重なった2つの輪＝結婚指輪のモチーフ）。読み上げには出さない */
+.auth-page .auth-guide__rings {
+    position: absolute;
+    z-index: 0;
+    right: -2rem;
+    bottom: -3rem;
+    width: 14rem;
+    height: 10rem;
+}
+
+.auth-guide__rings::before,
+.auth-guide__rings::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    width: 10rem;
+    height: 10rem;
+    border: 2px solid var(--color-main);
+    border-radius: 50%;
+    opacity: 0.35;
+}
+
+.auth-guide__rings::before {
+    left: 0;
+}
+
+.auth-guide__rings::after {
+    left: 4rem;
+}
+
+/* 右：登録フォーム */
+.auth-card {
+    grid-area: card;
+    padding: 2.5rem 2.25rem;
+    border: 1px solid var(--auth-color-rule);
+    border-radius: var(--auth-radius);
+    background-color: var(--color-surface);
+    box-shadow: var(--auth-shadow-card);
+}
+
+.auth-card__title {
+    margin-bottom: 0.5rem;
+    font-size: var(--auth-font-size-title);
+}
+
+.auth-card__lead {
+    margin-bottom: 1.75rem;
+    color: var(--color-text);
+}
+
+/* 入力欄 */
+.auth-form__summary {
+    margin-bottom: 1.5rem;
+    padding: 0.75rem 1rem;
+    border-left: 4px solid var(--auth-color-error);
+    border-radius: 0.25rem;
+    background-color: var(--auth-color-error-soft);
+    color: var(--auth-color-error);
+    font-weight: 700;
+}
+
+.auth-form__field {
+    margin-bottom: 1.5rem;
+}
+
+.auth-form__label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.375rem;
+    font-weight: 700;
+}
+
+.auth-form__required {
+    padding: 0 0.5rem;
+    border-radius: 0.25rem;
+    background-color: var(--auth-color-accent-soft);
+    color: var(--auth-color-accent);
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1.6;
+}
+
+.auth-form__input {
+    padding: 0.625rem 0.875rem;
+    border-color: var(--auth-color-placeholder);
+    border-radius: 0.5rem;
+    font-size: 1rem;
+}
+
+.auth-form__input::placeholder {
+    color: var(--color-text-sub);
+}
+
+.auth-form__input:focus {
+    border-color: var(--auth-color-accent);
+    box-shadow: var(--auth-focus-ring);
+}
+
+/* エラーのある欄は赤い枠にする（Bootstrap の is-invalid の色を、読みやすい濃さに上書き） */
+.auth-form__input.is-invalid,
+.auth-form__input.is-invalid:focus {
+    border-color: var(--auth-color-error);
+}
+
+.auth-form__input.is-invalid:focus {
+    box-shadow: var(--auth-focus-ring-error);
+}
+
+/* パスワード欄：右端に「表示／隠す」のボタンを重ねる */
+.auth-form__password {
+    position: relative;
+}
+
+.auth-form__password .auth-form__input {
+    padding-right: 4.5rem;
+}
+
+/* Bootstrap が is-invalid の欄に出す「！」の印は、ボタンと重なるので出さない */
+.auth-form__password .auth-form__input.is-invalid {
+    background-image: none;
+}
+
+.auth-form__toggle {
+    position: absolute;
+    top: 50%;
+    right: 0.5rem;
+    padding: 0.25rem 0.75rem;
+    border: 0;
+    border-radius: 0.375rem;
+    background-color: transparent;
+    color: var(--auth-color-accent);
+    font-size: var(--font-size-small);
+    font-weight: 700;
+    transform: translateY(-50%);
+    cursor: pointer;
+}
+
+.auth-form__toggle:hover {
+    background-color: var(--auth-color-accent-soft);
+}
+
+.auth-form__toggle:focus-visible {
+    outline: 3px solid var(--color-main);
+    outline-offset: 1px;
+}
+
+.auth-form__hint {
+    margin: 0.375rem 0 0;
+    color: var(--color-text-sub);
+    font-size: var(--font-size-small);
+    line-height: 1.6;
+}
+
+.auth-form__error {
+    margin: 0.375rem 0 0;
+    color: var(--auth-color-error);
+    font-size: var(--font-size-small);
+    font-weight: 700;
+    line-height: 1.6;
+}
+
+/* 登録ボタン：横幅いっぱいの丸いボタン（トップページのボタンと同じ形） */
+.auth-button {
+    display: block;
+    width: 100%;
+    margin-top: 2rem;
+    padding: 0.875rem 1.5rem;
+    border: 1px solid var(--auth-color-accent);
+    border-radius: 999px;
+    background-color: var(--auth-color-accent);
+    color: var(--auth-color-surface);
+    font-weight: 700;
+    line-height: 1.5;
+}
+
+.auth-button:hover {
+    border-color: var(--auth-color-accent-hover);
+    background-color: var(--auth-color-accent-hover);
+    color: var(--auth-color-surface);
+}
+
+.auth-button:active {
+    border-color: var(--auth-color-accent-active);
+    background-color: var(--auth-color-accent-active);
+    color: var(--auth-color-surface);
+}
+
+.auth-button:focus-visible {
+    outline: 3px solid var(--color-main);
+    outline-offset: 2px;
+    box-shadow: none;
+}
+
+.auth-card__switch {
+    margin: 1.5rem 0 0;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--auth-color-rule);
+    text-align: center;
+}
+
+.auth-card__switch-link {
+    margin-left: 0.25rem;
+    color: var(--auth-color-accent);
+    font-weight: 700;
+    text-underline-offset: 4px;
+}
+
+.auth-card__switch-link:hover {
+    color: var(--auth-color-accent-hover);
+}
+
+/* ログイン（P-03）：「パスワードを忘れた方はこちら」。パスワード欄のすぐ下に右寄せで置く */
+.auth-form__forgot {
+    margin: 0.5rem 0 0;
+    text-align: right;
+    font-size: var(--font-size-small);
+}
+
+.auth-form__forgot-link {
+    color: var(--auth-color-accent);
+    text-underline-offset: 4px;
+}
+
+.auth-form__forgot-link:hover {
+    color: var(--auth-color-accent-hover);
+}
+
+/* ログイン（P-03）の左側：会員登録への案内 */
+.auth-guide__text {
+    max-width: 36em;
+    margin-bottom: 1.75rem;
+}
+
+/* 左側の［会員登録してはじめる］。フォームのボタンと同じ形で、枠線だけの控えめな見た目にする */
+.auth-guide .auth-button {
+    display: inline-block;
+    width: auto;
+    margin-top: 0.5rem;
+    padding-right: 2rem;
+    padding-left: 2rem;
+}
+
+.auth-button--secondary {
+    background-color: var(--auth-color-surface);
+    color: var(--auth-color-accent);
+}
+
+.auth-button--secondary:hover,
+.auth-button--secondary:active {
+    background-color: var(--auth-color-accent-soft);
+    color: var(--auth-color-accent-active);
+}
+
+/* タブレット・スマホ：1列にして、フォームを先に、説明を後に並べる */
+@media (max-width: 991.98px) {
+    .auth-page__grid {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas:
+            "card"
+            "guide";
+        gap: 2rem;
+    }
+}
+
+@media (max-width: 575.98px) {
+    main.auth-page {
+        padding-top: 1.5rem;
+    }
+
+    .auth-guide,
+    .auth-card {
+        padding: 2rem 1.25rem;
+    }
+
+    .auth-card__title {
+        font-size: 1.625rem;
+    }
+
+    /* 狭い画面では飾りの輪が文章に重なるので出さない */
+    .auth-page .auth-guide__rings {
+        display: none;
+    }
+}
