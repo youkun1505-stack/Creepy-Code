@@ -4,10 +4,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+
+import com.creepycode.auth.entity.UserRole;
+import com.creepycode.auth.service.LoginService;
+import com.creepycode.auth.service.LoginUser;
 
 /**
  * トップページ（P-01）。
@@ -26,7 +31,13 @@ public class TopController {
     private static final String URL_SIMULATION = "/plan/simulation";
     private static final String URL_CHAT = "/chat";
 
-    /** ログイン後ハブの表示確認用の状態（ログイン機能ができるまでの仮のもの）。 */
+    private final LoginService loginService;
+
+    public TopController(LoginService loginService) {
+        this.loginService = loginService;
+    }
+
+    /** ログイン後ハブの表示確認用の状態（ヒアリング・プランの画面ができるまでの仮のもの）。 */
     enum DemoState {
         NEW, HEARING, PLAN, ASSIGNING, ASSIGNED
     }
@@ -43,31 +54,27 @@ public class TopController {
     public record HubMenuItem(String label, String url, boolean enabled, String note) {
     }
 
-    /** トップページ（未ログイン版）を表示する。 */
-    @GetMapping("/")
-    public String show(Model model) {
-        // TODO: 「今の流行」の中身（取得元は検討中）が決まったら、ここで Model に入れて画面に渡す（しょたこん）
-        // TODO: ログイン機能（Spring Security）を入れるときは、「/」と /css/** をログインなしで見られるようにする（しょたこん）
-        // TODO: ログイン機能ができたら、ログイン中の顧客にはここでハブ（showAfterLoginTmp の内容）を出す（しょたこん）
-        model.addAttribute("loggedIn", false);
-        return VIEW;
-    }
-
     /**
-     * ログイン後のハブを仮の URL で表示する（ログイン機能ができるまでの確認用）。
-     * 末尾の ?state= で状態を切り替える：new（初期値）／hearing／plan／assigning／assigned
-     * 本番では URL で切り替えず、ログイン中の顧客のデータから状態を決める（この URL ごと削除する）
+     * トップページを表示する。
+     * 未ログインのときはサービスの説明と会員登録・ログインを、ログイン中の顧客には各画面へのハブを出す。
+     * プランナー・管理者は、それぞれの画面へ進める。
+     * ハブの末尾の ?state= で表示の状態を切り替えられる：new（初期値）／hearing／plan／assigning／assigned（確認用の仮のもの）
      */
-    @GetMapping("/after-login-tmp")
-    public String showAfterLoginTmp(@RequestParam(name = "state", defaultValue = "new") String state,
-            Model model) {
-        // TODO: ログイン機能ができたら、この URL は削除し、状態はログイン中の顧客のプランから判定する（しょたこん）
+    @GetMapping("/")
+    public String show(@AuthenticationPrincipal LoginUser loginUser,
+            @RequestParam(name = "state", defaultValue = "new") String state, Model model) {
+        if (loginUser == null) {
+            // TODO: 「今の流行」の中身（取得元は検討中）が決まったら、ここで Model に入れて画面に渡す（しょたこん）
+            model.addAttribute("loggedIn", false);
+            return VIEW;
+        }
+        if (loginUser.getRole() != UserRole.CUSTOMER) {
+            return "redirect:" + loginService.homeUrl(loginUser.getRole());
+        }
+
+        // TODO: ヒアリング・プランの画面ができたら、?state= ではなく、ログイン中の顧客のデータから状態を決める（しょたこん）
         DemoState demoState = parseState(state);
         model.addAttribute("loggedIn", true);
-        // TODO: ログイン機能ができたら、ログイン中の顧客の USERS.NAME に置き換える（いまはテストデータの顧客の名前）（しょたこん）
-        // 会員登録（P-02）・ログイン（P-03）の直後だけは、その人の名前を出す（RegisterController・LoginController がフラッシュ属性で渡す）
-        Object flashMemberName = model.getAttribute("flashMemberName");
-        model.addAttribute("memberName", flashMemberName != null ? flashMemberName : "テスト 顧客");
         model.addAttribute("greeting", demoState == DemoState.NEW ? "ようこそ" : "おかえりなさい");
         model.addAttribute("nextAction", buildNextAction(demoState));
         model.addAttribute("progressSteps", buildProgressSteps(demoState));

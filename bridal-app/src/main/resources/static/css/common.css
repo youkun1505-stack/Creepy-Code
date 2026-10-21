@@ -76,7 +76,7 @@ h3 {
     margin: 0;
 }
 
-/* ログアウト：枠付きのボタン（いまはリンクなので、ボタンと同じ見た目になるよう inline-block と下線なしにしている） */
+/* ログアウト：枠付きのボタン（POST /logout の送信ボタン） */
 .site-logout {
     display: inline-block;
     padding: 0.375rem 1.25rem;
