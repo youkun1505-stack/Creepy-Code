@@ -31,6 +31,8 @@
       "PowerShell(mvnw.cmd -q test *)",
       "Bash(./mvnw.cmd -q test *)",
       "PowerShell(./mvnw.cmd -q test *)",
+      "Bash(sh .claude/hooks/run-bridal-app-test.sh)",
+      "PowerShell(sh .claude/hooks/run-bridal-app-test.sh)",
       "Bash(git branch -a)",
       "PowerShell(git branch -a)",
       "Bash(git branch -a --merged origin/develop)",
@@ -142,6 +144,17 @@
             "command": "git -C \"${CLAUDE_PROJECT_DIR}\" config core.hooksPath .githooks",
             "timeout": 30,
             "statusMessage": "Git のルール確認（.githooks）を有効にしています"
+          }
+        ]
+      },
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '司会役（メインの会話）は、作業を始める前に moderator スキルを読み込んでください。サブエージェントとして呼ばれた場合は読み込まないでください。'",
+            "timeout": 30,
+            "statusMessage": "司会役の案内を表示しています"
           }
         ]
       }
