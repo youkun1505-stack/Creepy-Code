@@ -47,10 +47,12 @@
                   th:data-send-url="@{/hearing/deepdive/messages}">
                 <label class="form-label" for="chatInput">相談の内容</label>
                 <textarea class="form-control" id="chatInput" rows="3" th:maxlength="${maxChatLength}"></textarea>
-                <p class="deepdive-chat__count">
-                    <span id="chatCountNow">0</span> / <span th:text="${maxChatLength}">1000</span>字
-                </p>
-                <button type="submit" class="btn btn-primary" id="chatSubmit">送信する</button>
+                <div class="deepdive-chat__form-footer">
+                    <p class="deepdive-chat__count">
+                        <span id="chatCountNow">0</span> / <span th:text="${maxChatLength}">1000</span>字
+                    </p>
+                    <button type="submit" class="deepdive-chat__submit" id="chatSubmit">送信する</button>
+                </div>
             </form>
         </section>
     </main>
