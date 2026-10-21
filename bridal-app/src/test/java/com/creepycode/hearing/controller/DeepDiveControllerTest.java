@@ -7,6 +7,8 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -21,13 +23,18 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+import com.creepycode.auth.entity.UserRole;
+import com.creepycode.auth.service.LoginUser;
+import com.creepycode.common.config.SecurityConfig;
 import com.creepycode.common.exception.AiException;
 import com.creepycode.hearing.dto.AiChatMessageView;
 import com.creepycode.hearing.entity.AiChatMessage;
@@ -35,18 +42,26 @@ import com.creepycode.hearing.service.AiChatService;
 
 /**
  * AI相談チャット（P-10）の Controller のテスト。DB は使わず、Service は偽物にする。
- * 利用者 ID は application.properties の app.hearing.dev-user-id（初期値 1）を使う。
+ * ログインの設定（SecurityConfig）も読み込み、USER_ID が 1 の顧客としてログインした状態で呼ぶ。
  */
 @WebMvcTest(DeepDiveController.class)
+@Import(SecurityConfig.class)
 class DeepDiveControllerTest {
 
     private static final String PATH = "/hearing/deepdive/messages";
+    // ログインした顧客（USER_ID は 1）
+    private static final LoginUser CUSTOMER =
+            new LoginUser(1L, "customer@example.com", null, "テスト 顧客", UserRole.CUSTOMER);
 
     @Autowired
     private MockMvc mockMvc;
 
     @MockitoBean
     private AiChatService aiChatService;
+
+    // SecurityConfig が使う（このテストではログインの確かめはしないので、偽物でよい）
+    @MockitoBean
+    private UserDetailsService userDetailsService;
 
     @BeforeEach
     void setUp() {
@@ -61,7 +76,7 @@ class DeepDiveControllerTest {
                 message(AiChatMessage.ROLE_USER, "式場の予約はいつ？", time),
                 message(AiChatMessage.ROLE_AI, "半年前からが目安です。", time)));
 
-        mockMvc.perform(get("/hearing/deepdive"))
+        mockMvc.perform(get("/hearing/deepdive").with(user(CUSTOMER)))
                 .andExpect(status().isOk())
                 .andExpect(view().name("hearing/deepdive"))
                 .andExpect(model().attribute("maxChatLength", 1000))
@@ -151,8 +166,25 @@ class DeepDiveControllerTest {
         send(PATH, "{\"content\":\"質問\"}", session).andExpect(jsonPath("$.giveUp").value(true));
     }
 
+    @Test
+    void ログイン中の顧客のUSER_IDで_履歴を読み_発言を送る() throws Exception {
+        // 以前の仮の USER_ID（1）とは違う番号の顧客でログインし、その番号が使われることを確かめる
+        LoginUser other = new LoginUser(42L, "hanako@example.com", null, "山田 花子", UserRole.CUSTOMER);
+        when(aiChatService.sendMessage(anyLong(), anyString())).thenReturn("返事です。");
+
+        mockMvc.perform(get("/hearing/deepdive").with(user(other))).andExpect(status().isOk());
+        mockMvc.perform(post(PATH).with(user(other)).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"content\":\"質問です\"}"))
+                .andExpect(status().isOk());
+
+        verify(aiChatService).findHistory(42L);
+        verify(aiChatService).sendMessage(42L, "質問です");
+    }
+
     private ResultActions send(String path, String json, MockHttpSession session) throws Exception {
         MockHttpServletRequestBuilder request = post(path)
+                .with(user(CUSTOMER))
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json);
         if (session != null) {

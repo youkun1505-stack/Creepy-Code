@@ -5,9 +5,9 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 
+import com.creepycode.auth.service.LoginUser;
 import com.creepycode.common.exception.AiException;
 import com.creepycode.hearing.dto.AiChatMessageRequest;
 import com.creepycode.hearing.dto.AiChatMessageView;
@@ -39,20 +40,17 @@ public class DeepDiveController {
     private static final int MAX_FAILURES = 3;
 
     private final AiChatService aiChatService;
-    // TODO: ログイン機能（別担当）ができたら、ログイン中の顧客の USER_ID に置き換える（Claude）
-    private final Long userId;
 
-    public DeepDiveController(AiChatService aiChatService, @Value("${app.hearing.dev-user-id}") Long userId) {
+    public DeepDiveController(AiChatService aiChatService) {
         this.aiChatService = aiChatService;
-        this.userId = userId;
     }
 
     /**
-     * 画面を表示する。それまでの相談の履歴を古い順に渡す（chatMessages）。
+     * 画面を表示する。ログイン中の顧客の、それまでの相談の履歴を古い順に渡す（chatMessages）。
      */
     @GetMapping
-    public String show(Model model) {
-        List<AiChatMessageView> chatMessages = aiChatService.findHistory(userId).stream()
+    public String show(@AuthenticationPrincipal LoginUser loginUser, Model model) {
+        List<AiChatMessageView> chatMessages = aiChatService.findHistory(loginUser.getUserId()).stream()
                 .map(message -> new AiChatMessageView(message.getRole(), message.getContent(), message.getCreatedAt()))
                 .toList();
         model.addAttribute("chatMessages", chatMessages);
@@ -68,11 +66,11 @@ public class DeepDiveController {
      */
     @PostMapping("/messages")
     @ResponseBody
-    public ResponseEntity<Map<String, Object>> sendMessage(@RequestBody AiChatMessageRequest request,
-            HttpSession session) {
+    public ResponseEntity<Map<String, Object>> sendMessage(@AuthenticationPrincipal LoginUser loginUser,
+            @RequestBody AiChatMessageRequest request, HttpSession session) {
         String content = request == null ? null : request.content();
         try {
-            String reply = aiChatService.sendMessage(userId, content);
+            String reply = aiChatService.sendMessage(loginUser.getUserId(), content);
             session.removeAttribute(FAILURE_COUNT);
             return ResponseEntity.ok(Map.of("ok", true, "reply", reply));
         } catch (IllegalArgumentException e) {
