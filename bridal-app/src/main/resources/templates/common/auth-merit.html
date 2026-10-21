@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ja" xmlns:th="http://www.thymeleaf.org">
+<body>
+<!-- 「登録すると、できること」の3つ。会員登録（P-02）とログイン（P-03）の左側で使う部品（見た目は css/auth.css） -->
+<ul class="auth-merit" th:fragment="merit">
+    <li class="auth-merit__item">
+        <span class="auth-merit__mark" aria-hidden="true"></span>
+        <div>
+            <h3 class="auth-merit__title">希望を整理できる</h3>
+            <p class="auth-merit__text">かんたんな質問に答えるだけで、まだ言葉になっていない好みも形になります。</p>
+        </div>
+    </li>
+    <li class="auth-merit__item">
+        <span class="auth-merit__mark" aria-hidden="true"></span>
+        <div>
+            <h3 class="auth-merit__title">AIに相談できる</h3>
+            <p class="auth-merit__text">「何から決めればいい？」も、AIに聞けます。ログインしたら、いつでも使えます。</p>
+        </div>
+    </li>
+    <li class="auth-merit__item">
+        <span class="auth-merit__mark" aria-hidden="true"></span>
+        <div>
+            <h3 class="auth-merit__title">プランナーにそのまま相談できる</h3>
+            <p class="auth-merit__text">AIのたたき台と「大事にしたいこと」が届くので、一から説明し直さなくて大丈夫です。</p>
+        </div>
+    </li>
+</ul>
+</body>
+</html>

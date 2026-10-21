@@ -65,7 +65,9 @@ public class TopController {
         DemoState demoState = parseState(state);
         model.addAttribute("loggedIn", true);
         // TODO: ログイン機能ができたら、ログイン中の顧客の USERS.NAME に置き換える（いまはテストデータの顧客の名前）（しょたこん）
-        model.addAttribute("memberName", "テスト 顧客");
+        // 会員登録（P-02）・ログイン（P-03）の直後だけは、その人の名前を出す（RegisterController・LoginController がフラッシュ属性で渡す）
+        Object flashMemberName = model.getAttribute("flashMemberName");
+        model.addAttribute("memberName", flashMemberName != null ? flashMemberName : "テスト 顧客");
         model.addAttribute("greeting", demoState == DemoState.NEW ? "ようこそ" : "おかえりなさい");
         model.addAttribute("nextAction", buildNextAction(demoState));
         model.addAttribute("progressSteps", buildProgressSteps(demoState));

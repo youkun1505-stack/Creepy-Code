@@ -144,6 +144,17 @@ main.top-page {
     min-width: 0;
 }
 
+/* ほかの画面から戻ってきたときの案内（例：会員登録の完了）。説明欄の上に1行で出す */
+.top-notice {
+    margin: 0 0 -1.5rem;
+    padding: 0.875rem 1.25rem;
+    border-left: 4px solid var(--top-color-accent);
+    border-radius: 0.5rem;
+    background-color: var(--top-color-accent-soft);
+    color: var(--color-text);
+    font-weight: 700;
+}
+
 /* 未ログインの説明欄と、ログイン後の「次にやること」欄。ページで唯一の色付きの面にする */
 .top-hero,
 .top-next {
