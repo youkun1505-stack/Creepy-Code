@@ -244,6 +244,18 @@ h3 {
     gap: 1rem;
 }
 
+.deepdive-chat__meta {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.deepdive-chat__shortcut {
+    color: var(--color-text-sub);
+    font-size: var(--font-size-small);
+}
+
 .deepdive-chat__count {
     margin: 0;
     color: var(--color-text-sub);
@@ -312,6 +324,15 @@ h3 {
         gap: 0.5rem;
     }
 
+    .deepdive-chat__meta {
+        justify-content: flex-end;
+    }
+
+    /* スマホのソフトウェアキーボードには通常 Ctrl キーが無いため非表示にする */
+    .deepdive-chat__shortcut {
+        display: none;
+    }
+
     .deepdive-chat__count {
         text-align: right;
     }
@@ -321,4 +342,5 @@ h3 {
         padding: 0.75rem 1.5rem;
     }
 }
+
 

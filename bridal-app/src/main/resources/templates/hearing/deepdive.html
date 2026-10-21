@@ -48,9 +48,12 @@
                 <label class="form-label" for="chatInput">相談の内容</label>
                 <textarea class="form-control" id="chatInput" rows="3" th:maxlength="${maxChatLength}"></textarea>
                 <div class="deepdive-chat__form-footer">
-                    <p class="deepdive-chat__count">
-                        <span id="chatCountNow">0</span> / <span th:text="${maxChatLength}">1000</span>字
-                    </p>
+                    <div class="deepdive-chat__meta">
+                        <span class="deepdive-chat__shortcut">Ctrl + Enter で送信</span>
+                        <p class="deepdive-chat__count">
+                            <span id="chatCountNow">0</span> / <span th:text="${maxChatLength}">1000</span>字
+                        </p>
+                    </div>
                     <button type="submit" class="deepdive-chat__submit" id="chatSubmit">送信する</button>
                 </div>
             </form>
