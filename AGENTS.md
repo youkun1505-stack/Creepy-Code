@@ -52,7 +52,7 @@ Codex はこのファイルを直接読みます。Claude Code は `.claude/CLAU
   - Claude Code：`.claude/agents/` に全部の役。モデルと推論の強さも定義ファイルに書いてある。
   - Codex：`.codex/agents/` に `implementer`・`reviewer` だけ。ほかの役の仕事は司会役が行うか、新しい会話で行う。
 - モデルの使い分けは、道具ごとの定義ファイルに書いてある（Codex は `.codex/agents/`：実装役は軽いモデル、レビュー役は賢いモデル）。
-  Claude Code では、司会役が Opus 5.5、設計役・レビュー役が Sonnet 5.5、ほかの役が Haiku 5.5。格上げの手順は `.claude/CLAUDE.md` の「格上げ」。
+  Claude Code では、司会役が Opus 5.5、設計役・レビュー役が Sonnet 5.5、ほかの役が Haiku 5.5。格上げの手順は、Claude Code の `moderator` スキル（`.claude/skills/moderator/SKILL.md`）の「格上げ」。
 - Claude Code には、この流れの外で使うハーネス点検（`harness-optimizer`）もある。ハーネスを見直すときだけ使う。
 - サブエージェントとして呼ばれた場合は、司会役の仕事はせず、自分の定義ファイルの役割だけを行う。
 - サブエージェントを使えない道具では、実装が終わったら一度会話を閉じ、新しい会話でレビューする。

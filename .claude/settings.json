@@ -146,6 +146,17 @@
             "statusMessage": "Git のルール確認（.githooks）を有効にしています"
           }
         ]
+      },
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '司会役（メインの会話）は、作業を始める前に moderator スキルを読み込んでください。サブエージェントとして呼ばれた場合は読み込まないでください。'",
+            "timeout": 30,
+            "statusMessage": "司会役の案内を表示しています"
+          }
+        ]
       }
     ],
     "PreToolUse": [
