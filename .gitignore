@@ -89,13 +89,8 @@ $RECYCLE.BIN/
 .fuse_hidden*
 .Trash-*
 
-# --- Claude Code 設定（個人設定は共有しない。AIハーネスの共有設定だけ Git に入れる） ---
-.claude/*
-!.claude/agents/
-!.claude/skills/
-!.claude/hooks/
-!.claude/settings.json
-!.claude/CLAUDE.md
+# --- Claude Code 設定（個人設定は共有しない） ---
+.claude/
 
 # --- 一時ファイル / バックアップ ---
 *.tmp
@@ -147,6 +142,3 @@ coverage/
 *.ora
 *.trc
 *.dmp
-
-# --- AIハーネス（作業メモ・チケット・引き継ぎ記録は一時ファイルなので共有しない） ---
-.ai-tmp/

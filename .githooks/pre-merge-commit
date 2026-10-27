@@ -1,5 +1,0 @@
-#!/bin/sh
-# 手元での取り込み（merge）でコミットが作られる前に、いまのブランチを確かめる。
-. "$(dirname "$0")/_rules.sh"
-check_branch_for_commit
-exit 0
