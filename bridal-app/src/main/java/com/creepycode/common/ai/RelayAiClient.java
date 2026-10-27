@@ -31,7 +31,7 @@ public class RelayAiClient implements AiClient {
 
     private static final Logger log = LoggerFactory.getLogger(RelayAiClient.class);
 
-    // 基本設計書 6-5：AI の応答が30秒以内に返らない場合は失敗として扱う
+    // 基本設計書 v1.5（v1.5_対応表とテスト観点.md T16）：AI の応答が30秒以内に返らない場合は失敗として扱う
     private static final Duration TIMEOUT = Duration.ofSeconds(30);
 
     private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();

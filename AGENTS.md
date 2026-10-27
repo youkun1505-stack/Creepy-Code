@@ -175,7 +175,7 @@ Codex はこのファイルを直接読みます。Claude Code は `.claude/CLAU
 ## 6. 変更してはいけないもの
 
 - `AGENTS.md`・`.claude/`・`.codex/`・`.githooks/`・`.gitignore`・`.gitattributes`（リーダーに頼まれたときだけ）
-- 秘密情報：API キーをどこにも書かない（Gemini の API キーは環境変数 `GEMINI_API_KEY`）。`.env` などを読まない。
+- 秘密情報：API キーをどこにも書かない。AI は Sign in with ChatGPT を使い、API キーは使わない。サインインの情報（`npm run sign-in` で `%USERPROFILE%\.creepy-code` に作られる）をリポジトリに入れない・読まない。`.env` などを読まない。
 - `docs/` の Word・PowerPoint・Excel ファイル
 - `db/保留/` の SQL を実行しない。授業用の DB ユーザーとテーブルに触らない。
 
