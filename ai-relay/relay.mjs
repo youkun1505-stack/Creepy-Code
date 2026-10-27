@@ -59,9 +59,14 @@ function statusOf(error) {
   return Number.isInteger(error.status) && error.status >= 400 ? error.status : 502;
 }
 
-function sendJson(response, status, body) {
+function sendJson(response, status, body, headers = {}) {
   const text = JSON.stringify(body);
-  response.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'content-length': Buffer.byteLength(text), 'cache-control': 'no-store' });
+  response.writeHead(status, {
+    'content-type': 'application/json; charset=utf-8',
+    'content-length': Buffer.byteLength(text),
+    'cache-control': 'no-store',
+    ...headers,
+  });
   response.end(text);
 }
 
@@ -69,18 +74,28 @@ function readJson(request) {
   return new Promise((resolve, reject) => {
     const chunks = [];
     let size = 0;
+    let exceeded = false;
     request.on('data', (chunk) => {
+      if (exceeded) return;
       size += chunk.length;
       if (size > MAX_BODY_BYTES) {
+        exceeded = true;
+        // 接続を切断せず、残りの受信データを読み捨ててストリームを終了へ向かわせる
+        request.resume();
         reject(new ChatGPTError('invalid_request', '送る内容が大きすぎます。'));
-        request.destroy();
-      } else chunks.push(chunk);
+        return;
+      }
+      chunks.push(chunk);
     });
     request.on('end', () => {
+      if (exceeded) return;
       try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8'))); }
       catch { reject(new ChatGPTError('invalid_request', '本文が JSON として読めません。')); }
     });
-    request.on('error', reject);
+    request.on('error', (err) => {
+      if (exceeded) return;
+      reject(err);
+    });
   });
 }
 
@@ -130,8 +145,10 @@ function serve() {
       // AI に送った内容・返ってきた内容は、ログにもエラーにも出さない（エラーの種類とメッセージだけ返す）
       const typed = error instanceof ChatGPTError ? error : new ChatGPTError('relay_error', '中継プログラムの中でエラーが起きました。');
       console.error(`[${new Date().toISOString()}] ${request.method} ${request.url} -> ${typed.code}`);
-      if (!response.headersSent) sendJson(response, statusOf(typed), { error: typed.toJSON() });
-      else response.destroy();
+      if (!response.headersSent) {
+        const status = statusOf(typed);
+        sendJson(response, status, { error: typed.toJSON() }, status >= 400 ? { connection: 'close' } : {});
+      } else response.destroy();
     });
   });
   server.on('error', (error) => {
