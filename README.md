@@ -1,67 +1,187 @@
 # Creepy-Code
 
-企画開発用リポジトリ
+**AIブライダルプランニング支援システム（P2C：Creepy Code）** の設計書・マニュアルと、アプリ本体（Spring Boot）をまとめて管理しているリポジトリです。
 
-AIブライダルプランニング支援システム（P2C：Creepy Code）の設計書・マニュアルと、アプリ本体（Spring Boot）をまとめて管理しています。
+---
 
-## 使っている技術
+## 1. アプリの概要
 
-- Java 17 / Spring Boot 3.5 / Maven
-- Spring Data JPA / Supabase（PostgreSQL。チーム全員で1つのプロジェクトを共有）
-- Thymeleaf ＋ Thymeleaf Layout Dialect ＋ Bootstrap 5
-- Spring Security（フォーム認証・BCrypt）
-- AI：Sign in with ChatGPT（ChatGPT のプランの利用枠で呼ぶ。API キーは使わない。初期状態はダミーモード）
-  - Java から直接は使えないため、Node.js の中継プログラム（`ai-relay/`）を経由する
+結婚式を挙げる新郎新婦（顧客）と、式場のウエディングプランナーを AI でつなぎ、おふたりの理想に寄り添った結婚式プランの作成を支援する Web アプリケーションです。
 
-アプリは各自の PC（ローカル環境）で動かし、データベースだけインターネット上の Supabase を使います（AWS は使いません）。
-データベースの接続情報は環境変数で渡し、このリポジトリには書きません（公開リポジトリのため）。
+### だれが使うか（利用者の種類と役割）
+- **顧客（新郎新婦）**：事前ヒアリングや AI との深掘り質問に答えることで、自分たちの希望や大切にしたい価値観を明確にし、ぴったりなプランと見積もりを見つけることができます。
+- **ウエディングプランナー**：AI がまとめた顧客の希望やプラン内容を確認し、式場のプロとしてより具体的なプランの提案・見積もり調整・チャット相談を行います。
+- **管理者**：システム全体の管理、プランナーへの顧客の担当割り当て、料金マスタの設定などを行います。
 
-## フォルダ構成
+---
+
+## 2. アプリの流れ（主な機能）
+
+システムは以下の流れで利用します。
+
+```mermaid
+graph LR
+    A[会員登録・ログイン] --> B[事前ヒアリング]
+    B --> C[AI深掘り質問]
+    C --> D[マイプラン生成・料金試算]
+    D --> E[AI相談・プランナー相談]
+```
+
+1. **会員登録・ログイン**（顧客・プランナー・管理者）
+   - メールアドレスとパスワードでログインします。利用者の種別（顧客・プランナー・管理者）に応じて、専用の初期画面が表示されます。
+2. **事前ヒアリング＆ AI 深掘り質問**
+   - 挙式希望時期・人数・予算・重視したいテーマなどのアンケートに回答します。
+   - 回答内容をもとに、AI がさらにふたりのこだわりや価値観を引き出す「深掘り質問」を行います。
+3. **マイプラン作成・料金シミュレーション**
+   - ヒアリングと深掘りの結果から、おふたりに合わせた結婚式プランが作成されます。
+   - 料理・装花・演出などのオプションを変更しながら、リアルタイムに見積もり料金の増減をシミュレーションできます。
+4. **AI チャット相談・プランナー相談**
+   - 気になる疑問や演出の相談を AI と自由にやり取りできます。
+   - 担当プランナーが決まると、プランナーとの直接チャットやプランの最終合意へ進むことができます。
+
+---
+
+## 3. 使っている技術
+
+- **プログラミング言語・フレームワーク**：Java 17 / Spring Boot 3.5 / Maven
+- **データベース**：Supabase（PostgreSQL。チーム全員で1つのプロジェクトを共有） / Spring Data JPA
+- **画面（フロントエンド）**：Thymeleaf ＋ Thymeleaf Layout Dialect ＋ Bootstrap 5
+- **認証・セキュリティ**：Spring Security（フォームログイン・BCrypt 暗号化）
+- **AI 連携**：Sign in with ChatGPT（中継プログラム `ai-relay/` 経由。API キーは使わず、ChatGPT の有料プラン利用枠を使用）
+
+アプリ本体は各自の PC（ローカル環境）で動かし、データベースのみインターネット上の Supabase に接続します。
+データベースの接続情報などの秘密情報は環境変数で設定し、リポジトリ内には一切含めません。
+
+---
+
+## 4. 動かし方（ビルドと起動手順）
+
+### 必要な環境
+- Windows 10 / 11（64bit）
+- Java 17（JDK 17）
+- Node.js 22.12 以上（※本物の AI を動かす PC のみ必要）
+
+### 必要な環境変数（データベース接続情報）
+アプリを起動する前に、以下の3つの環境変数を設定してください。
+公開リポジトリのため、秘密の値はリポジトリには書かれていません。具体的な値はチームの連絡帳（Discord 等）で共有されているものを使用してください。
+
+| 環境変数の名前 | 説明 | 設定する値（例） |
+| --- | --- | --- |
+| `DB_URL` | Supabase（PostgreSQL）の接続先 URL | `jdbc:postgresql://<ホスト名>:5432/postgres?sslmode=require` |
+| `DB_USERNAME` | データベースの接続ユーザー名 | `postgres.<プロジェクトID>` |
+| `DB_PASSWORD` | データベースの接続パスワード | （チームで共有されたパスワード） |
+
+---
+
+### 起動手順 1：コマンドライン（PowerShell）で動かす場合
+
+1. **bridal-app フォルダに移動**：
+   ```powershell
+   cd bridal-app
+   ```
+
+2. **テストを実行して確認**（省略可）：
+   ```powershell
+   .\mvnw.cmd test
+   ```
+
+3. **アプリを起動**：
+   ```powershell
+   .\mvnw.cmd spring-boot:run
+   ```
+
+4. **ブラウザで確認**：
+   起動後、ブラウザで [http://localhost:8080](http://localhost:8080) にアクセスします。
+
+---
+
+### 起動手順 2：Eclipse（Pleiades）で動かす場合
+
+1. **プロジェクトの取り込み**：
+   - Eclipse のメニューから「ファイル」→「インポート」を開きます。
+   - 「Maven」→「既存 Maven プロジェクト」を選び、`bridal-app` フォルダを指定して完了します。
+2. **環境変数の設定**：
+   - パッケージ・エクスプローラーで `bridal-app` を右クリックし、「実行」→「実行の構成」を開きます。
+   - 「Spring Boot アプリケーション」（または「Java アプリケーション」）の対象設定を選び、「環境」タブを開きます。
+   - 「新規」を押し、上記の3つの環境変数（`DB_URL`、`DB_USERNAME`、`DB_PASSWORD`）を登録します。
+3. **起動**：
+   - `BridalApplication.java` を右クリックして「実行」→「Spring Boot アプリケーション」で起動します。
+   - ブラウザで [http://localhost:8080](http://localhost:8080) にアクセスします。
+
+---
+
+## 5. AI の使い方（Sign in with ChatGPT）
+
+### 初期状態：ダミーモード（初期設定不要）
+初期状態（環境変数 `APP_AI_MODE` を設定しない場合）は **「ダミーモード（`dummy`）」** で動作します。
+固定の回答を返すため、Node.js や ChatGPT の準備をしなくても画面の動作や通常の機能確認が行えます。
+
+### 本物の AI（ChatGPT）を使う場合の手順
+本物の AI を動かす場合は、以下の手順で中継プログラム（`ai-relay/`）を立ち上げ、アプリから呼び出せるようにします。
+
+1. **中継プログラムの準備（最初の1回だけ）**：
+   ```powershell
+   cd ai-relay
+   npm run setup
+   ```
+2. **ChatGPT へのサインイン（PC ごとに最初の1回だけ）**：
+   ```powershell
+   npm run sign-in
+   ```
+   - ブラウザが開くので、ChatGPT にサインインしてプランの利用を許可します（チームでは仲村のアカウントを使用します）。
+   - サインイン情報は `C:\Users\<ユーザー名>\.creepy-code\chatgpt` に保存されます。
+   - 情報は Windows の機能（DPAPI）で暗号化されるため、**本物の AI を動かす PC ごとにサインインが必要**です（`ai-relay/dpapi.mjs:1-4`）。
+   - サインインしていないと、AI を呼んでもエラーになります（`relay.mjs:43,56`）。
+3. **中継プログラムの起動（AI を使うときは常に起動しておく）**：
+   ```powershell
+   npm start
+   ```
+   ※起動した画面（PowerShell）は開いたままにしておきます（ポート 8787 で待受）。
+4. **アプリ側の設定と起動**：
+   - Windows の環境変数 `APP_AI_MODE` に `chatgpt` を設定します。
+   - Eclipse またはターミナルを再起動し、環境変数を反映させてから `bridal-app` を起動します。
+
+### AI 関連の環境変数一覧
+
+| 環境変数の名前 | 設定する値 | いつ設定するか | 根拠 |
+| --- | --- | --- | --- |
+| `APP_AI_MODE` | `chatgpt`（本物の AI）／`dummy`（固定の文章。未設定ならこちら） | **本物の AI を使う PC だけ** | `bridal-app/src/main/resources/application.properties:56` |
+| `APP_AI_RELAY_URL` | 初期値 `http://127.0.0.1:8787` | 中継のポート番号を変えたときだけ | 同:58 |
+| `AI_RELAY_PORT` | 初期値 `8787` | 8787 番が他のアプリで使われているときだけ | `ai-relay/relay.mjs:19` |
+| `AI_RELAY_SIGN_IN_PORT` | 初期値 `8788` | 8788 番が他のアプリで使われているときだけ | `ai-relay/relay.mjs:21` |
+| `AI_RELAY_MODEL` | 初期値 `gpt-6-luna` | 使用する AI モデルを変更するときだけ | `ai-relay/relay.mjs:23` |
+| `CREEPY_CODE_HOME` | 初期値 `C:\Users\<ユーザー名>\.creepy-code` | サインイン情報の保存先を変えるときだけ | `ai-relay/paths.mjs:6` |
+
+> [!NOTE]
+> - `application.properties` にある `app.ai.mode` などの項目は**アプリ内部の設定名**であり、環境変数そのものではありません。メンバーは `application.properties` を直接書き換えないでください。
+> - API キー（`GEMINI_API_KEY` 等）は使用しません。
+> - `APP_AI_MODE` に `dummy`・`chatgpt` 以外（例：`api`）を入れても、エラーにならずにダミーで動くと考えられます（`matchIfMissing=true` からの推測）。
+
+---
+
+## 6. フォルダ構成
 
 ```
 Creepy-Code/
-├─ bridal-app/        … アプリ本体（Eclipse で「既存 Maven プロジェクト」として読み込む）
-├─ ai-relay/          … AI 用の中継プログラム（Node.js。本物の AI を使う PC でだけ動かす）
-├─ db/                … Supabase の SQL Editor で実行する SQL（管理担当が実行）
-│   ├─ 00〜03_*.sql         … スキーマ・テーブル・仮データ・テストユーザーの作成（共有DBで実行済み）
+├─ bridal-app/        … アプリ本体（Spring Boot / Java 17）
+├─ ai-relay/          … AI 用の中継プログラム（Node.js。本物の AI を使う PC で動かす）
+├─ db/                … Supabase で実行する SQL（テーブル定義・テストデータなど）
+│   ├─ 00〜03_*.sql         … スキーマ・テーブル・仮データ・テストユーザー（共有DBで実行済み）
 │   └─ 保留/                … 全テーブル削除の SQL（ふだんは実行しない）
+├─ .agent-memory/     … チームの長期記憶（決定事項・共有知識）
 └─ docs/
-    ├─ 00_ブライダル業界/   … 業界調査・基本設計書など
+    ├─ 00_ブライダル業界/   … 業界調査・基本設計書
     ├─ 01_テンプレート/
     ├─ 02_提出物/
     ├─ 03_Git&Sourcetree操作マニュアル/
     └─ 04_開発ルール/       … コーディング規約
 ```
 
-## 本物の AI を使うまでの手順
+---
 
-初期状態ではダミーモード（固定の文章を返す）で動作します。本物の AI（ChatGPT）を使う場合は、以下の手順で設定します。
+## 7. 関連資料
 
-1. `ai-relay` フォルダで `npm run setup` を実行する（最初の1回だけ）。
-2. `ai-relay` フォルダで `npm run sign-in` を実行し、ブラウザで ChatGPT にサインインして、プランの利用を許可する（チームでは仲村のアカウントを使う）。
-   - サインインの情報は、このとき `C:\Users\<ユーザー名>\.creepy-code\chatgpt` に作られます（`ai-relay/paths.mjs:10`、`relay.mjs:37`）。
-   - 情報は Windows の機能（DPAPI）で暗号化され、元に戻せるのは同じ PC の同じ Windows ユーザーだけです。そのため、**本物の AI を動かす PC ごとにサインインが必要**です（`ai-relay/dpapi.mjs:1-4`）。
-   - サインインしていないと、AI を呼んでもエラーになります（`relay.mjs:43,56`）。
-3. `ai-relay` フォルダで `npm start` を実行する（画面は開いたままにする）。
-4. Windows の環境変数 `APP_AI_MODE` に `chatgpt` を設定し、Eclipse を再起動してから bridal-app を起動する。
-
-## 設定する環境変数
-
-| 環境変数の名前 | 設定する値 | いつ設定するか | 根拠 |
-| --- | --- | --- | --- |
-| `APP_AI_MODE` | `chatgpt`（本物の AI）／`dummy`（固定の文章。設定しなければこちら） | **本物の AI を使う PC だけ** | `bridal-app/src/main/resources/application.properties:56` |
-| `APP_AI_RELAY_URL` | 初期値 `http://127.0.0.1:8787` | 中継のポートを変えたときだけ | 同:58 |
-| `AI_RELAY_PORT` | 初期値 `8787` | 8787 番が使えないときだけ（変えたら `APP_AI_RELAY_URL` も合わせる） | `ai-relay/relay.mjs:19` |
-| `AI_RELAY_SIGN_IN_PORT` | 初期値 `8788` | 8788 番が使えないときだけ | `ai-relay/relay.mjs:21` |
-| `AI_RELAY_MODEL` | 初期値 `gpt-6-luna` | 使う AI のモデルを変えるときだけ | `ai-relay/relay.mjs:23` |
-| `CREEPY_CODE_HOME` | 初期値 `C:\Users\<ユーザー名>\.creepy-code` | 保存先を変えるときだけ | `ai-relay/paths.mjs:6` |
-
-- `application.properties` の `app.ai.mode`・`app.ai.relay-url` は、**アプリの中の設定の名前で、環境変数ではありません**。たとえば `app.ai.mode=${APP_AI_MODE:dummy}` は、「環境変数 `APP_AI_MODE` の値を使い、なければ `dummy`」という意味です。メンバーは `application.properties` を書き換えないでください。
-- API キーは使いません。`GEMINI_API_KEY` を読むコードも、`app.ai.api-key` という設定もありません。
-- `APP_AI_MODE` に `dummy`・`chatgpt` 以外（例：`api`）を入れても、エラーにならずにダミーで動くと考えられます（`matchIfMissing=true` からの推測）。
-
-## 資料
-
-- [ai-relay の使い方](ai-relay/README.md) … 本物の AI を使うときの中継プログラム
-- [コーディング規約](docs/04_開発ルール/コーディング規約.md) … 命名規則・パッケージ構成（機能ごと）など
-- [基本設計書 v1.6](docs/00_ブライダル業界/03_基本設計書/v1.6/基本設計書_v1.6.docx)
+- [ai-relay の使い方](ai-relay/README.md) … AI 中継プログラムの詳しい説明
+- [コーディング規約](docs/04_開発ルール/コーディング規約.md) … 命名規則・パッケージ構成など
+- [基本設計書 v1.6](docs/00_ブライダル業界/03_基本設計書/v1.6/基本設計書_v1.6.docx) … システム全体の基本設計書
+- [チームの長期記憶（決まったこと・知識一覧）](.agent-memory/index.md) … これまでに決定した事項や共有知識のまとめ
