@@ -18,6 +18,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import com.creepycode.common.exception.AiException;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -31,7 +32,7 @@ public class RelayAiClient implements AiClient {
 
     private static final Logger log = LoggerFactory.getLogger(RelayAiClient.class);
 
-    // 基本設計書 v1.5（v1.5_対応表とテスト観点.md T16）：AI の応答が30秒以内に返らない場合は失敗として扱う
+    // 基本設計書 6-5：AI の応答が30秒以内に返らない場合は失敗として扱う
     private static final Duration TIMEOUT = Duration.ofSeconds(30);
 
     private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
@@ -78,7 +79,14 @@ public class RelayAiClient implements AiClient {
                     .build();
             HttpResponse<String> response = httpClient.send(request,
                     HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            JsonNode json = objectMapper.readTree(response.body());
+            JsonNode json;
+            try {
+                json = objectMapper.readTree(response.body());
+            } catch (JsonProcessingException e) {
+                // 中継プログラムには接続できたが、返答が JSON でなかった場合
+                log.warn("中継プログラムの返答を JSON として読めませんでした：status={}", response.statusCode());
+                throw new AiException("AI の返答の形式が正しくありませんでした。");
+            }
             if (response.statusCode() != 200) {
                 // AI に送った内容はログに出さない（エラーの種類だけ出す）
                 String code = json.path("error").path("code").asText("unknown");
@@ -86,6 +94,10 @@ public class RelayAiClient implements AiClient {
                 throw new AiException("AI の呼び出しに失敗しました（" + code + "）");
             }
             return json.path("text").asText();
+        } catch (JsonProcessingException e) {
+            // リクエストボディの直列化に失敗した場合（通常は発生しない）
+            log.warn("リクエストの直列化に失敗しました：{}", e.getClass().getSimpleName());
+            throw new AiException("AI へのリクエストを作れませんでした。", e);
         } catch (IOException e) {
             log.warn("中継プログラムを呼び出せませんでした：{}", e.getClass().getSimpleName());
             throw new AiException("AI を呼び出せませんでした。中継プログラムが起動しているか確認してください。", e);
