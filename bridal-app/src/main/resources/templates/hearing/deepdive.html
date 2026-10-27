@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ja" xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{common/layout}">
+<head>
+    <title>AIに相談する</title>
+</head>
+<body>
+    <main class="container site-main" layout:fragment="content">
+        <h1 class="page-title">AIに相談する</h1>
+        <p class="page-lead">結婚式のことで気になることを、ふつうの言葉で書いて送ってください。</p>
+
+        <section class="deepdive-chat" aria-label="AIとの相談">
+            <!-- 履歴が無いときだけ出す、相談のしかたの案内 -->
+            <div class="deepdive-chat__guide" id="chatGuide" th:if="${#lists.isEmpty(chatMessages)}">
+                <p class="deepdive-chat__guide-title">相談のしかた</p>
+                <p>下の入力欄に、知りたいことや迷っていることを書いて送ってください。例えば次のような質問です。</p>
+                <ul class="deepdive-chat__examples">
+                    <li>予算が少なくても、満足できる披露宴はできますか？</li>
+                    <li>ゲストが50人ほどのとき、どんな会場が合いますか？</li>
+                    <li>ドレス選びで、最初に決めておいたほうがよいことは何ですか？</li>
+                </ul>
+            </div>
+
+            <!-- 相談の発言の一覧（古い順に上から。AI は左、利用者は右）。新しい発言はここに足す -->
+            <ol class="deepdive-chat__log" id="chatLog" role="log" aria-live="polite" aria-label="相談の履歴" tabindex="0">
+                <li th:each="message : ${chatMessages}" class="deepdive-message"
+                    th:classappend="${message.role == 'USER'} ? 'deepdive-message--user' : 'deepdive-message--ai'">
+                    <div class="deepdive-message__bubble">
+                        <p class="deepdive-message__speaker"
+                           th:text="${message.role == 'USER'} ? 'あなた' : 'AI'">AI</p>
+                        <p class="deepdive-message__text" th:text="${message.content}">本文</p>
+                    </div>
+                </li>
+            </ol>
+
+            <!-- 返事を待つあいだの表示 -->
+            <p class="deepdive-chat__pending d-none" id="chatPending" role="status">考えています…</p>
+
+            <!-- 失敗したときの表示。やり直せるときは「やり直す」を出す -->
+            <div class="alert alert-danger d-none" id="chatError" role="alert">
+                <p class="deepdive-chat__error-message" id="chatErrorMessage"></p>
+                <button type="button" class="btn btn-primary" id="chatRetry">やり直す</button>
+            </div>
+
+            <!-- 送信の入力欄。送信は JavaScript（fetch）で行い、画面を読み込み直さない -->
+            <form class="deepdive-chat__form" id="chatForm" method="post"
+                  th:data-send-url="@{/hearing/deepdive/messages}">
+                <label class="form-label" for="chatInput">相談の内容</label>
+                <textarea class="form-control" id="chatInput" rows="3" th:maxlength="${maxChatLength}"></textarea>
+                <div class="deepdive-chat__form-footer">
+                    <div class="deepdive-chat__meta">
+                        <span class="deepdive-chat__shortcut">Ctrl + Enter で送信</span>
+                        <p class="deepdive-chat__count">
+                            <span id="chatCountNow">0</span> / <span th:text="${maxChatLength}">1000</span>字
+                        </p>
+                    </div>
+                    <button type="submit" class="deepdive-chat__submit" id="chatSubmit">送信する</button>
+                </div>
+            </form>
+        </section>
+    </main>
+
+    <th:block layout:fragment="scripts">
+        <script th:src="@{/js/deepdive.js}"></script>
+    </th:block>
+</body>
+</html>

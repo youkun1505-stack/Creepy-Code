@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ja" xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- JavaScript から POST するときに使う CSRF トークン（Spring Security が有効なときだけ出力される） -->
+    <meta name="_csrf" th:if="${_csrf}" th:content="${_csrf.token}">
+    <meta name="_csrf_header" th:if="${_csrf}" th:content="${_csrf.headerName}">
+    <title layout:title-pattern="$CONTENT_TITLE | $LAYOUT_TITLE">AIブライダルプランニング</title>
+    <!-- 全画面共通のフォント（見出し：Zen Old Mincho／本文：Zen Kaku Gothic New）。使う太さだけ読み込む -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700&family=Zen+Old+Mincho:wght@700&display=swap">
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/css/bootstrap.min.css}">
+    <link rel="stylesheet" th:href="@{/css/common.css}">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container site-header__inner">
+            <a class="site-header__title" th:href="@{/}">AIブライダルプランニング</a>
+            <!-- ログイン中だけ：会員名とログアウト（Controller が memberName を渡した画面だけ出る） -->
+            <!-- TODO: ログイン機能ができたら、memberName ではなくログイン情報（sec:authorize など）で出し分け、全画面に出す（しょたこん） -->
+            <div class="site-header__member" th:if="${memberName != null}">
+                <span class="site-header__name"><span th:text="${memberName}">テスト 顧客</span> 様</span>
+                <!-- いまはログイン機能が無く POST /logout を受ける先が無いので、押すとトップ（未ログイン版）に戻るリンクにしている -->
+                <!-- TODO: ログイン機能ができたら、Spring Security の作法に合わせて POST /logout のフォームに戻す（CSRF の値は th:action が自動で付ける）（しょたこん） -->
+                <a class="site-logout" th:href="@{/}">ログアウト</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="container site-main" layout:fragment="content">
+        <!-- 各画面の中身がここに入る -->
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">Creepy Code</div>
+    </footer>
+
+    <th:block layout:fragment="scripts">
+        <!-- 各画面の JavaScript がここに入る -->
+    </th:block>
+</body>
+</html>
