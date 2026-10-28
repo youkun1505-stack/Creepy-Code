@@ -1,0 +1,685 @@
+/* かんたん質問（事前ヒアリング STEP1〜4、P-06〜P-09）専用のスタイル */
+/* 全画面共通の色・文字サイズは common.css の変数を使い、かんたん質問だけで使う値はここの変数にまとめる */
+.hearing-page {
+    /* common.css にある色は、値を書き写さずに共通の変数を使う（共通の色を変えたときにずれないように） */
+    --hearing-color-accent: var(--color-main-dark);
+    --hearing-color-accent-hover: #744a54;
+    --hearing-color-accent-active: #5f3c45;
+    --hearing-color-accent-soft: var(--color-main-soft);
+    --hearing-color-placeholder: #d9c4c8;
+    --hearing-color-rule: var(--color-rule);
+    --hearing-color-surface: #fffbfb;
+    --hearing-color-error: #b02a37;
+    --hearing-color-error-soft: #fbeaec;
+    /* STEP1 のカードの色（並び順。帯と選んだときの枠に使う） */
+    --hearing-card-color-1: var(--color-main);
+    --hearing-card-color-2: #c98b5e;
+    --hearing-card-color-3: #6f87ad;
+    --hearing-card-color-4: #b3933f;
+    --hearing-card-color-5: #9c4a4a;
+    --hearing-card-color-6: #6f9a7e;
+    --hearing-font-size-title: 1.75rem;
+    --hearing-font-size-card-title: 1.125rem;
+    --hearing-font-size-result: 1.375rem;
+    --hearing-radius: 0.75rem;
+}
+
+/* 横幅は Bootstrap の .container（ヘッダーと同じ）に任せる。共通レイアウトの main（.site-main）は、この画面の main で置き換わる */
+main.hearing-page {
+    padding-top: 2rem;
+    padding-bottom: 4rem;
+    line-height: 1.8;
+    letter-spacing: 0.02em;
+}
+
+/* 進み具合：ステップの数字を線でつなぐ */
+.hearing-progress {
+    margin-bottom: 2rem;
+}
+
+.hearing-progress__count {
+    margin: 0 0 0.75rem;
+    color: var(--hearing-color-accent);
+    font-size: var(--font-size-small);
+    font-weight: 700;
+}
+
+.hearing-progress__list {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.5rem;
+    max-width: 40rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.hearing-progress__list::before {
+    content: "";
+    position: absolute;
+    top: 1rem;
+    right: 12.5%;
+    left: 12.5%;
+    border-top: 1px solid var(--hearing-color-placeholder);
+}
+
+.hearing-progress__step {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    text-align: center;
+}
+
+.hearing-progress__mark {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border: 1px solid var(--hearing-color-placeholder);
+    border-radius: 50%;
+    background-color: var(--hearing-color-surface);
+    color: var(--color-text-sub);
+    font-size: var(--font-size-small);
+}
+
+.hearing-progress__label {
+    color: var(--color-text-sub);
+    font-size: var(--font-size-small);
+    line-height: 1.5;
+}
+
+.hearing-progress__step.is-done .hearing-progress__mark {
+    border-color: var(--hearing-color-accent);
+    background-color: var(--hearing-color-accent-soft);
+    color: var(--hearing-color-accent);
+}
+
+.hearing-progress__step.is-current .hearing-progress__mark {
+    border-color: var(--hearing-color-accent);
+    background-color: var(--hearing-color-accent);
+    color: var(--hearing-color-surface);
+    font-weight: 700;
+}
+
+.hearing-progress__step.is-current .hearing-progress__label {
+    color: var(--color-text);
+    font-weight: 700;
+}
+
+/* 見出しと説明 */
+.hearing-title {
+    margin: 0 0 0.75rem;
+    color: var(--hearing-color-accent);
+    font-size: var(--hearing-font-size-title);
+}
+
+.hearing-lead {
+    margin: 0 0 2rem;
+    color: var(--color-text);
+}
+
+/* 選ばれていないまま送ったときのメッセージ */
+.hearing-form__summary {
+    margin-bottom: 1.5rem;
+    padding: 0.75rem 1rem;
+    border-left: 4px solid var(--hearing-color-error);
+    border-radius: 0.25rem;
+    background-color: var(--hearing-color-error-soft);
+    color: var(--hearing-color-error);
+    font-weight: 700;
+}
+
+/* カード：全幅で3列×2段（PC 基準） */
+.hearing-cards {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.25rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.hearing-card {
+    --hearing-card-color: var(--hearing-card-color-1);
+    display: flex;
+    margin: 0;
+    cursor: pointer;
+}
+
+.hearing-card--2 {
+    --hearing-card-color: var(--hearing-card-color-2);
+}
+
+.hearing-card--3 {
+    --hearing-card-color: var(--hearing-card-color-3);
+}
+
+.hearing-card--4 {
+    --hearing-card-color: var(--hearing-card-color-4);
+}
+
+.hearing-card--5 {
+    --hearing-card-color: var(--hearing-card-color-5);
+}
+
+.hearing-card--6 {
+    --hearing-card-color: var(--hearing-card-color-6);
+}
+
+/* 本体：上に色の帯。選ぶと枠がカードの色になる */
+.hearing-card__body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-height: 9rem;
+    padding: 1.5rem 1.25rem 1.25rem;
+    border: 2px solid var(--hearing-color-rule);
+    border-top: 6px solid var(--hearing-card-color);
+    border-radius: var(--hearing-radius);
+    background-color: var(--color-surface);
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.hearing-card:hover .hearing-card__body {
+    background-color: var(--hearing-color-surface);
+}
+
+.hearing-card__input:checked + .hearing-card__body {
+    border-color: var(--hearing-card-color);
+    background-color: var(--hearing-color-surface);
+}
+
+/* キーボードで選んでいるカードが分かるようにする（ラジオボタン本体は見えないので、カードに枠を出す） */
+.hearing-card__input:focus-visible + .hearing-card__body {
+    outline: 3px solid var(--color-main);
+    outline-offset: 2px;
+}
+
+.hearing-card__name {
+    font-family: var(--font-heading);
+    font-size: var(--hearing-font-size-card-title);
+    font-weight: 700;
+    line-height: 1.5;
+}
+
+.hearing-card__input:checked + .hearing-card__body .hearing-card__name::before {
+    content: "✓ ";
+    color: var(--hearing-card-color);
+}
+
+.hearing-card__description {
+    color: var(--color-text-sub);
+    font-size: var(--font-size-small);
+    line-height: 1.7;
+}
+
+/* 戻る・次へ */
+.hearing-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 2.5rem;
+}
+
+.hearing-button {
+    min-width: 10rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: 999px;
+    font-weight: 700;
+    line-height: 1.5;
+}
+
+.hearing-button:focus-visible {
+    outline: 3px solid var(--color-main);
+    outline-offset: 2px;
+    box-shadow: none;
+}
+
+.hearing-button--primary {
+    border: 1px solid var(--hearing-color-accent);
+    background-color: var(--hearing-color-accent);
+    color: var(--hearing-color-surface);
+}
+
+.hearing-button--primary:hover {
+    border-color: var(--hearing-color-accent-hover);
+    background-color: var(--hearing-color-accent-hover);
+    color: var(--hearing-color-surface);
+}
+
+.hearing-button--primary:active {
+    border-color: var(--hearing-color-accent-active);
+    background-color: var(--hearing-color-accent-active);
+    color: var(--hearing-color-surface);
+}
+
+/* カードを選ぶまで押せない状態 */
+.hearing-button--primary:disabled {
+    border-color: var(--hearing-color-placeholder);
+    background-color: var(--hearing-color-placeholder);
+    color: var(--hearing-color-surface);
+    opacity: 1;
+}
+
+.hearing-button--secondary {
+    border: 1px solid var(--hearing-color-accent);
+    background-color: var(--hearing-color-surface);
+    color: var(--hearing-color-accent);
+}
+
+.hearing-button--secondary:hover {
+    border-color: var(--hearing-color-accent);
+    background-color: var(--hearing-color-accent-soft);
+    color: var(--hearing-color-accent);
+}
+
+/* 動きを減らす設定の人には、色の切り替えを動かさない */
+@media (prefers-reduced-motion: reduce) {
+    .hearing-card__body {
+        transition: none;
+    }
+}
+
+/* タブレット：カードは2列 */
+@media (max-width: 991.98px) {
+    .hearing-cards {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* スマホ：カードは1列。ボタンは縦に並べ、［次へ］を上にする */
+@media (max-width: 575.98px) {
+    .hearing-cards {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .hearing-card__body {
+        min-height: 0;
+    }
+
+    .hearing-actions {
+        flex-direction: column-reverse;
+        align-items: stretch;
+    }
+
+    .hearing-button {
+        width: 100%;
+    }
+}
+
+/* ===== STEP2（P-07）：2段階で好みを選ぶ ===== */
+
+/* hidden 属性で隠す部品（操作のボタンなど）は、CSS で display を決めていても必ず隠す（Bootstrap の指定に頼らない） */
+.hearing-visual [hidden] {
+    display: none !important;
+}
+
+/* JS が動かないとき：1回目・2回目を見出しで分けた、チェックボックス付きの一覧 */
+.hearing-visual__round + .hearing-visual__round {
+    margin-top: 2.5rem;
+}
+
+.hearing-visual__round-title {
+    margin: 0 0 1rem;
+    color: var(--hearing-color-accent);
+    font-size: var(--hearing-font-size-card-title);
+}
+
+.hearing-visual__round-lead {
+    margin: 0 0 1rem;
+    color: var(--color-text-sub);
+    font-size: var(--font-size-small);
+}
+
+.hearing-visual__list {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.25rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.hearing-visual__label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: 0;
+    cursor: pointer;
+}
+
+.hearing-visual__image {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: 1px solid var(--hearing-color-rule);
+    border-radius: var(--hearing-radius);
+    background-color: var(--color-surface);
+}
+
+.hearing-visual__caption {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    color: var(--color-text-sub);
+    font-size: var(--font-size-small);
+}
+
+.hearing-visual__check {
+    width: 1.125rem;
+    height: 1.125rem;
+    accent-color: var(--hearing-color-accent);
+}
+
+/* 2回目の組：見出し・2枚の画像・ボタン */
+.hearing-visual__pairs {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.hearing-visual__pair-title {
+    margin: 0 0 0.75rem;
+    color: var(--color-text);
+    font-family: var(--font-heading);
+    font-size: var(--hearing-font-size-card-title);
+    font-weight: 700;
+    text-align: center;
+}
+
+.hearing-visual__pair-images {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
+}
+
+.hearing-visual__pair-choices {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+/* JS が動くとき：1画面に1つだけ出す。［ちがう］［好き］は画像の左右に置く
+   （縦に積むと、ノート PC の画面（高さ 768px など）でボタンが下にはみ出すため） */
+.hearing-visual.is-swipe {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 28rem) minmax(0, 1fr);
+    grid-template-areas:
+        "counter counter counter"
+        "skip image like"
+        "hint hint hint"
+        "actions actions actions";
+    column-gap: 1.5rem;
+    align-items: center;
+}
+
+/* 1回目・2回目の箱を消して、中身を上のグリッドに並べる。見出しと一覧向けの説明は隠す */
+.hearing-visual.is-swipe .hearing-visual__round {
+    display: contents;
+}
+
+.hearing-visual.is-swipe .hearing-visual__round-title,
+.hearing-visual.is-swipe .hearing-visual__round-lead {
+    display: none;
+}
+
+.hearing-visual.is-swipe .hearing-visual__counter {
+    grid-area: counter;
+}
+
+.hearing-visual.is-swipe .hearing-visual__list {
+    display: block;
+    grid-area: image;
+}
+
+/* 2回目の組は、左右のボタンの列も使って横いっぱいに出す */
+.hearing-visual.is-swipe .hearing-visual__pairs {
+    display: block;
+    grid-row: 2;
+    grid-column: 1 / -1;
+    width: 100%;
+    max-width: 52rem;
+    justify-self: center;
+}
+
+/* ［どちらも好き］［どちらもちがう］は、左右の画像のあいだに置く（画像の下に置くと、ノート PC の画面ではみ出すため） */
+.hearing-visual.is-swipe .hearing-visual__pair {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-areas:
+        "title title title"
+        "left choices right";
+    column-gap: 1.25rem;
+    align-items: center;
+}
+
+.hearing-visual.is-swipe .hearing-visual__pair[hidden] {
+    display: none;
+}
+
+.hearing-visual.is-swipe .hearing-visual__pair-title {
+    grid-area: title;
+}
+
+.hearing-visual.is-swipe .hearing-visual__pair-images {
+    display: contents;
+}
+
+.hearing-visual.is-swipe .hearing-visual__pair-option[data-pair-option="left"] {
+    grid-area: left;
+}
+
+.hearing-visual.is-swipe .hearing-visual__pair-option[data-pair-option="right"] {
+    grid-area: right;
+}
+
+.hearing-visual.is-swipe .hearing-visual__pair-choices {
+    flex-direction: column;
+    grid-area: choices;
+    gap: 0.5rem;
+    margin-top: 0;
+}
+
+.hearing-visual.is-swipe .hearing-visual__pair-option {
+    padding: 0.25rem;
+    border-radius: var(--hearing-radius);
+}
+
+.hearing-visual.is-swipe .hearing-visual__pair-option:hover .hearing-visual__image {
+    border-color: var(--hearing-color-accent);
+}
+
+.hearing-visual.is-swipe .hearing-visual__label {
+    cursor: default;
+}
+
+.hearing-visual.is-swipe .hearing-visual__pair-option {
+    cursor: pointer;
+}
+
+.hearing-visual.is-swipe .hearing-visual__check {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+}
+
+/* ボタンを包む箱を消して、2つのボタンをそれぞれ画像の左右に置く */
+.hearing-visual.is-swipe .hearing-visual__choices {
+    display: contents;
+}
+
+.hearing-visual.is-swipe .hearing-visual__skip {
+    grid-area: skip;
+    justify-self: end;
+}
+
+.hearing-visual.is-swipe .hearing-visual__like {
+    grid-area: like;
+    justify-self: start;
+}
+
+.hearing-visual.is-swipe .hearing-visual__hint {
+    grid-area: hint;
+}
+
+.hearing-visual.is-swipe .hearing-actions {
+    grid-area: actions;
+}
+
+.hearing-visual__counter {
+    margin: 0 0 0.75rem;
+    color: var(--hearing-color-accent);
+    font-weight: 700;
+    text-align: center;
+}
+
+.hearing-visual__choices .hearing-button {
+    min-width: 12rem;
+}
+
+.hearing-visual__hint {
+    margin: 0.75rem 0 0;
+    color: var(--color-text-sub);
+    font-size: var(--font-size-small);
+    text-align: center;
+}
+
+/* ［1つ戻る］：文字だけの控えめなボタン */
+.hearing-text-button {
+    padding: 0.5rem 1rem;
+    border: 0;
+    background-color: transparent;
+    color: var(--hearing-color-accent);
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+}
+
+.hearing-text-button:hover {
+    color: var(--hearing-color-accent-hover);
+}
+
+.hearing-text-button:disabled {
+    color: var(--hearing-color-placeholder);
+    text-decoration: none;
+}
+
+.hearing-text-button:focus-visible {
+    outline: 3px solid var(--color-main);
+    outline-offset: 2px;
+    box-shadow: none;
+}
+
+/* ===== STEP2 のまとめ ===== */
+
+.hearing-result__headline {
+    margin: 0 0 1.5rem;
+    color: var(--color-text);
+    font-family: var(--font-heading);
+    font-size: var(--hearing-font-size-result);
+    font-weight: 700;
+    line-height: 1.6;
+}
+
+/* 好きなテイストごとの、細かい好み */
+.hearing-result__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    max-width: 40rem;
+    margin: 0 0 1.5rem;
+    padding: 0;
+    list-style: none;
+}
+
+.hearing-result__row {
+    display: grid;
+    grid-template-columns: 11rem minmax(0, 1fr);
+    align-items: baseline;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    border-left: 4px solid var(--hearing-color-accent);
+    background-color: var(--hearing-color-surface);
+}
+
+.hearing-result__label {
+    font-weight: 700;
+}
+
+.hearing-result__detail {
+    color: var(--color-text);
+}
+
+/* タブレット：一覧は2列 */
+@media (max-width: 991.98px) {
+    .hearing-visual__list {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* スマホ：一覧は1列 */
+@media (max-width: 575.98px) {
+    .hearing-visual__list {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    /* スマホでは、画像の下に［ちがう］［好き］を横に並べる */
+    .hearing-visual.is-swipe {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-areas:
+            "counter counter"
+            "image image"
+            "skip like"
+            "hint hint"
+            "actions actions";
+        gap: 0.75rem;
+    }
+
+    .hearing-visual.is-swipe .hearing-visual__skip,
+    .hearing-visual.is-swipe .hearing-visual__like {
+        justify-self: stretch;
+        min-width: 0;
+    }
+
+    .hearing-visual.is-swipe .hearing-visual__pairs {
+        grid-row: 2;
+    }
+
+    /* スマホでは、［どちらも好き］［どちらもちがう］は画像の下に横に並べる */
+    .hearing-visual.is-swipe .hearing-visual__pair {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-areas:
+            "title title"
+            "left right"
+            "choices choices";
+        gap: 0.5rem;
+    }
+
+    .hearing-visual.is-swipe .hearing-visual__pair-choices {
+        flex-direction: row;
+        margin-top: 0.5rem;
+    }
+
+    .hearing-visual__pair-images {
+        gap: 0.5rem;
+    }
+
+    .hearing-result__row {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0.25rem;
+    }
+}
