@@ -8,6 +8,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -57,17 +58,65 @@ public class ChatGptSignIn {
         this.out = out;
     }
 
-    /** 既定のブラウザで URL を開く。開けなければ false。 */
+    /**
+     * 既定のブラウザで URL を開く。開けなければ false。
+     * Desktop が使えるときは Desktop.browse で開く。使えないとき（Spring の起動は headless になる）は、
+     * Windows なら rundll32 で既定のブラウザを開く。
+     */
     public static boolean openInDefaultBrowser(String url) {
-        try {
-            if (!Desktop.isDesktopSupported() || !Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+        if (desktopBrowseAvailable()) {
+            try {
+                Desktop.getDesktop().browse(URI.create(url));
+                return true;
+            } catch (IOException | RuntimeException e) {
                 return false;
             }
-            Desktop.getDesktop().browse(URI.create(url));
-            return true;
-        } catch (IOException | RuntimeException e) {
+        }
+        return openWithWindowsShell(url, System.getProperty("os.name"), ChatGptSignIn::startCommand);
+    }
+
+    /** Desktop で BROWSE が使えるか。headless のときは false。 */
+    private static boolean desktopBrowseAvailable() {
+        try {
+            return Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE);
+        } catch (RuntimeException e) {
             return false;
         }
+    }
+
+    /**
+     * Windows の既定のブラウザで URL を開く（rundll32 の FileProtocolHandler を呼ぶ）。
+     * cmd の start は使わない。URL の & が区切りとして解釈されるため。URL は引数1つとして渡す。
+     * Windows 以外と、https:// 以外の URL では何も起動せず false を返す。
+     *
+     * @param url      開く URL
+     * @param osName   OS の名前（本物は os.name）
+     * @param launcher コマンドを起動する方法（本物は ProcessBuilder）
+     */
+    static boolean openWithWindowsShell(String url, String osName, CommandLauncher launcher) {
+        if (osName == null || !osName.startsWith("Windows") || url == null || !url.startsWith("https://")) {
+            return false;
+        }
+        try {
+            launcher.launch(List.of("rundll32", "url.dll,FileProtocolHandler", url));
+            return true;
+        } catch (IOException | RuntimeException e) {
+            // 起動の失敗は種類だけ扱う。URL（state・nonce を含む）は出さない
+            return false;
+        }
+    }
+
+    /** ProcessBuilder でコマンドを起動する。起動できなければ IOException。 */
+    private static void startCommand(List<String> command) throws IOException {
+        new ProcessBuilder(command).start();
+    }
+
+    /** コマンドを起動する部品。テストでは本物を起動せず、渡された内容だけを確かめる。 */
+    @FunctionalInterface
+    interface CommandLauncher {
+
+        /** コマンドを起動する。起動できなければ例外。 */
+        void launch(List<String> command) throws IOException;
     }
 
     /**
