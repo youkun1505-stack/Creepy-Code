@@ -32,7 +32,7 @@ public class RelayAiClient implements AiClient {
 
     private static final Logger log = LoggerFactory.getLogger(RelayAiClient.class);
 
-    // 基本設計書 6-5：AI の応答が30秒以内に返らない場合は失敗として扱う
+    // 基本設計書 v1.5（v1.5_対応表とテスト観点.md T16）
     private static final Duration TIMEOUT = Duration.ofSeconds(30);
 
     private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
@@ -79,19 +79,26 @@ public class RelayAiClient implements AiClient {
                     .build();
             HttpResponse<String> response = httpClient.send(request,
                     HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            if (response.statusCode() != 200) {
+                // エラー応答の本文は JSON とは限らないため、状態コードを先に判定する
+                String code = "unknown";
+                try {
+                    JsonNode errorJson = objectMapper.readTree(response.body());
+                    code = errorJson.path("error").path("code").asText("unknown");
+                } catch (JsonProcessingException e) {
+                    // JSON 以外のエラー本文では、状態コードと unknown で記録する
+                }
+                // AI に送った内容はログに出さない（エラーの種類だけ出す）
+                log.warn("中継プログラムがエラーを返しました：status={} code={}", response.statusCode(), code);
+                throw new AiException("AI の呼び出しに失敗しました（" + code + "）");
+            }
             JsonNode json;
             try {
                 json = objectMapper.readTree(response.body());
             } catch (JsonProcessingException e) {
-                // 中継プログラムには接続できたが、返答が JSON でなかった場合
+                // 中継プログラムには接続できたが、正常応答の本文が JSON でなかった場合
                 log.warn("中継プログラムの返答を JSON として読めませんでした：status={}", response.statusCode());
-                throw new AiException("AI の返答の形式が正しくありませんでした。");
-            }
-            if (response.statusCode() != 200) {
-                // AI に送った内容はログに出さない（エラーの種類だけ出す）
-                String code = json.path("error").path("code").asText("unknown");
-                log.warn("中継プログラムがエラーを返しました：status={} code={}", response.statusCode(), code);
-                throw new AiException("AI の呼び出しに失敗しました（" + code + "）");
+                throw new AiException("AI の返答の形式が正しくありませんでした。", e);
             }
             return json.path("text").asText();
         } catch (JsonProcessingException e) {

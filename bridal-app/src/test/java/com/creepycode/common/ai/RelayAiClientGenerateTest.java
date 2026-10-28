@@ -13,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import com.creepycode.common.exception.AiException;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 
@@ -55,7 +56,7 @@ class RelayAiClientGenerateTest {
     }
 
     @Test
-    void 返答がJSONでないとき_呼び出せないではなく形式エラーになる() {
+    void 正常応答の返答がJSONでないとき_形式エラーになり原因を保持する() {
         server.createContext("/generate", exchange -> {
             byte[] body = "これは JSON ではありません".getBytes(StandardCharsets.UTF_8);
             exchange.sendResponseHeaders(200, body.length);
@@ -67,14 +68,12 @@ class RelayAiClientGenerateTest {
         // 「呼び出せませんでした」のメッセージでなく、形式エラーのメッセージになること
         assertThatThrownBy(() -> client.generate("指示", "入力"))
                 .isInstanceOf(AiException.class)
-                .hasMessageContaining("返答の形式が正しくありませんでした");
+                .hasMessageContaining("返答の形式が正しくありませんでした")
+                .hasCauseInstanceOf(JsonProcessingException.class);
     }
 
     @Test
-    void 返答がJSONでないとき_ログにステータスコードが含まれる() {
-        // ステータスコードのログ出力はログ実装に依存するため、
-        // ここでは例外メッセージが「呼び出せませんでした」でないことだけを確かめる
-        // （ログの内容は目視確認が必要）
+    void 非200応答の本文がJSONでないとき_呼び出し失敗になる() {
         server.createContext("/generate", exchange -> {
             byte[] body = "<html>エラーページ</html>".getBytes(StandardCharsets.UTF_8);
             exchange.sendResponseHeaders(500, body.length);
@@ -85,8 +84,8 @@ class RelayAiClientGenerateTest {
 
         assertThatThrownBy(() -> client.generate("指示", "入力"))
                 .isInstanceOf(AiException.class)
-                .hasMessageContaining("返答の形式が正しくありませんでした")
-                .hasMessageNotContaining("中継プログラムが起動しているか確認してください");
+                .hasMessageContaining("AI の呼び出しに失敗しました（unknown）")
+                .hasMessageNotContaining("返答の形式が正しくありませんでした");
     }
 
     @Test
@@ -104,4 +103,3 @@ class RelayAiClientGenerateTest {
                 .hasMessageContaining("auth_error");
     }
 }
-
