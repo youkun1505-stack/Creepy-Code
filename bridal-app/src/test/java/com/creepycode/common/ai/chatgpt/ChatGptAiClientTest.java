@@ -21,7 +21,13 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 
 import com.creepycode.common.ai.AiClient;
 import com.creepycode.common.ai.DummyAiClient;
@@ -64,6 +70,8 @@ class ChatGptAiClientTest {
     private final List<Captured> requests = new CopyOnWriteArrayList<>();
     private volatile Responder responder;
     private volatile CountDownLatch release;
+    private ListAppender<ILoggingEvent> logs;
+    private Logger logger;
 
     @BeforeEach
     void startFakeServer() throws IOException {
@@ -76,6 +84,11 @@ class ChatGptAiClientTest {
             responder.respond(exchange);
         });
         server.start();
+        // ログは ListAppender で捕まえて、中身を確かめる
+        logs = new ListAppender<>();
+        logs.start();
+        logger = (Logger) LoggerFactory.getLogger(ChatGptAiClient.class);
+        logger.addAppender(logs);
     }
 
     @AfterEach
@@ -83,6 +96,7 @@ class ChatGptAiClientTest {
         // 途中で止めた応答を先に解放してから、偽サーバーを止める
         release.countDown();
         server.stop(0);
+        logger.detachAppender(logs);
     }
 
     @Test
@@ -176,6 +190,71 @@ class ChatGptAiClientTest {
     }
 
     @Test
+    void 本文のerrorのcode_type_paramだけを_警告のログに足し_message_や送った内容は出さない() throws IOException {
+        signIn(EXPIRES_LATER);
+        responder = exchange -> sseError(exchange, 400, "{\"error\":{\"message\":\"秘密の文\","
+                + "\"type\":\"invalid_request_error\",\"param\":\"model\",\"code\":\"model_not_found\"}}");
+
+        assertThatThrownBy(() -> client(Duration.ofSeconds(30)).generate(INSTRUCTIONS, INPUT))
+                .isInstanceOf(AiException.class)
+                .hasMessage("AI の呼び出しに失敗しました（HTTP 400）。");
+
+        List<String> warnings = warnings();
+        assertThat(warnings).hasSize(1);
+        assertThat(warnings.get(0))
+                .endsWith("status=400 code=model_not_found type=invalid_request_error param=model")
+                .doesNotContain("秘密の文")
+                .doesNotContain(TOKEN)
+                .doesNotContain(INSTRUCTIONS)
+                .doesNotContain(INPUT);
+    }
+
+    @Test
+    void 入口のエラーの形_detailだけ_も警告のログに足す() throws IOException {
+        signIn(EXPIRES_LATER);
+        responder = exchange -> sseError(exchange, 401, "{\"detail\":\"Not authenticated\"}");
+
+        assertThatThrownBy(() -> client(Duration.ofSeconds(30)).generate(INSTRUCTIONS, INPUT))
+                .isInstanceOf(AiException.class)
+                .hasMessageContaining("サインインし直して");
+
+        assertThat(warnings()).hasSize(1);
+        assertThat(warnings().get(0)).endsWith("status=401 detail=Not authenticated");
+    }
+
+    @Test
+    void 改行は空白にして_項目は100文字までに切る() throws IOException {
+        signIn(EXPIRES_LATER);
+        responder = exchange -> sseError(exchange, 400, "{\"error\":{\"code\":\"x\\ny\"}}");
+        assertThatThrownBy(() -> client(Duration.ofSeconds(30)).generate(INSTRUCTIONS, INPUT))
+                .isInstanceOf(AiException.class);
+        assertThat(warnings()).hasSize(1);
+        assertThat(warnings().get(0)).endsWith("status=400 code=x y");
+
+        requests.clear();
+        responder = exchange -> sseError(exchange, 400, "{\"error\":{\"code\":\"" + "a".repeat(150) + "\"}}");
+        assertThatThrownBy(() -> client(Duration.ofSeconds(30)).generate(INSTRUCTIONS, INPUT))
+                .isInstanceOf(AiException.class);
+        assertThat(warnings()).hasSize(2);
+        assertThat(warnings().get(1)).endsWith("status=400 code=" + "a".repeat(100));
+    }
+
+    @Test
+    void 本文がJSONでないときは_ログはstatusだけで_例外は今までどおり() throws IOException {
+        signIn(EXPIRES_LATER);
+        responder = exchange -> sseError(exchange, 400, "<html>bad gateway " + INPUT + "</html>");
+
+        assertThatThrownBy(() -> client(Duration.ofSeconds(30)).generate(INSTRUCTIONS, INPUT))
+                .isInstanceOf(AiException.class)
+                .hasMessage("AI の呼び出しに失敗しました（HTTP 400）。");
+
+        assertThat(warnings()).hasSize(1);
+        assertThat(warnings().get(0))
+                .endsWith("ChatGPT の AI 呼び出しがエラーを返しました：status=400")
+                .doesNotContain(INPUT);
+    }
+
+    @Test
     void サインインしていないときは_通信せずに例外にする() {
         responder = exchange -> sseOk(exchange, completed());
 
@@ -242,6 +321,14 @@ class ChatGptAiClientTest {
 
     private void signIn(Instant expiresAt) {
         store.save(new ChatGptCredentials(TOKEN, REFRESH, null, expiresAt, "openid"));
+    }
+
+    /** このテストの間に出た警告（WARN）のログの文を、出た順に返す。 */
+    private List<String> warnings() {
+        return logs.list.stream()
+                .filter(event -> event.getLevel() == Level.WARN)
+                .map(ILoggingEvent::getFormattedMessage)
+                .toList();
     }
 
     private static String delta(String text) {

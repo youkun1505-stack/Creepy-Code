@@ -59,6 +59,11 @@ public class ChatGptAiClient implements AiClient {
     private static final String EVENT_FAILED = "response.failed";
     private static final String EVENT_ERROR = "error";
 
+    /** エラーの応答の本文を読む上限（バイト）。これより後ろは読まない。 */
+    private static final int MAX_ERROR_BODY_BYTES = 16 * 1024;
+    /** ログに出す項目1つの長さの上限（文字）。 */
+    private static final int MAX_FIELD_CHARS = 100;
+
     private final ChatGptCredentialStore store;
     private final URI responsesUri;
     private final String model;
@@ -178,12 +183,51 @@ public class ChatGptAiClient implements AiClient {
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(response.body(), StandardCharsets.UTF_8))) {
             if (response.statusCode() != 200) {
-                // 本文は出さず、HTTP の番号だけをログに残す
-                log.warn("ChatGPT の AI 呼び出しがエラーを返しました：status={}", response.statusCode());
+                // 本文はそのまま出さず、原因の項目（code・type・param など）だけをログに足す。reader はまだ何も読んでいない
+                String detail = errorDetail(response.body());
+                log.warn("ChatGPT の AI 呼び出しがエラーを返しました：status={}{}", response.statusCode(), detail);
                 throw new AiException(messageFor(response.statusCode()));
             }
             return readEvents(reader);
         }
+    }
+
+    /**
+     * エラーの応答の本文（上限まで）から、原因の項目だけを「 code=… type=… param=… detail=…」の形で返す。
+     * error.message と本文の残りは使わない。JSON でない・読めないときは空の文字（HTTP の番号だけをログに残す）。
+     */
+    private String errorDetail(InputStream body) {
+        try {
+            JsonNode json = objectMapper.readTree(body.readNBytes(MAX_ERROR_BODY_BYTES));
+            if (json == null || !json.isObject()) {
+                return "";
+            }
+            JsonNode error = json.path("error");
+            StringBuilder detail = new StringBuilder();
+            appendField(detail, "code", error.path("code"));
+            appendField(detail, "type", error.path("type"));
+            appendField(detail, "param", error.path("param"));
+            appendField(detail, "detail", json.path("detail"));
+            return detail.toString();
+        } catch (IOException e) {
+            return "";
+        }
+    }
+
+    /** 値が文字の項目だけを、短く切って末尾に足す（改行は空白にする）。無い項目は何も足さない。 */
+    private static void appendField(StringBuilder out, String name, JsonNode node) {
+        if (node == null || !node.isValueNode() || node.isNull()) {
+            return;
+        }
+        String text = node.asText().replaceAll("\\p{Cntrl}+", " ").trim();
+        if (text.isEmpty()) {
+            return;
+        }
+        int length = text.codePointCount(0, text.length());
+        if (length > MAX_FIELD_CHARS) {
+            text = text.substring(0, text.offsetByCodePoints(0, MAX_FIELD_CHARS));
+        }
+        out.append(' ').append(name).append('=').append(text);
     }
 
     /**
