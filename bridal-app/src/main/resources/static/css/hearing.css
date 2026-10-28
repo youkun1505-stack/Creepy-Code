@@ -683,3 +683,275 @@ main.hearing-page {
         gap: 0.25rem;
     }
 }
+
+/* ===== STEP3（P-08）：日程と予算 ===== */
+
+/* 進み具合の下に出す「日程と予算 1/2」（STEP3 は2ページに分けているため） */
+.hearing-substep {
+    margin-bottom: 0.25rem;
+    color: var(--color-text-sub);
+    font-size: var(--font-size-small);
+}
+
+/* 入力欄（左）と説明（右）を横に並べる（PC 基準）。狭い画面では縦に積む */
+.hearing-basic {
+    /* STEP3 だけで使う文字サイズ */
+    --hearing-font-size-input: 1.125rem;
+    --hearing-font-size-note-title: 1rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 2rem;
+    align-items: start;
+}
+
+.hearing-field {
+    padding: 1.5rem;
+    border: 1px solid var(--hearing-color-rule);
+    border-radius: var(--hearing-radius);
+    background-color: var(--hearing-color-surface);
+}
+
+.hearing-field__label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 700;
+}
+
+/* 予算の入力欄と「万円」を横に並べる */
+.hearing-field__row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.hearing-field__input {
+    max-width: 16rem;
+    font-size: var(--hearing-font-size-input);
+}
+
+.hearing-field__input:focus {
+    border-color: var(--hearing-color-accent);
+    box-shadow: 0 0 0 0.2rem var(--hearing-color-accent-soft);
+}
+
+/* 正しくない値を送ったときの入力欄 */
+.hearing-field__input[aria-invalid="true"] {
+    border-color: var(--hearing-color-error);
+}
+
+/* 「まだ決まっていない」にチェックして押せなくなった入力欄 */
+.hearing-field__input:disabled {
+    background-color: var(--color-background-sub);
+    color: var(--color-text-sub);
+}
+
+.hearing-field__unit {
+    font-size: var(--hearing-font-size-input);
+}
+
+.hearing-undecided {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    cursor: pointer;
+}
+
+.hearing-undecided__input {
+    margin: 0;
+    cursor: pointer;
+}
+
+.hearing-undecided__input:checked {
+    border-color: var(--hearing-color-accent);
+    background-color: var(--hearing-color-accent);
+}
+
+.hearing-undecided__input:focus-visible {
+    outline: 3px solid var(--color-main);
+    outline-offset: 2px;
+    box-shadow: none;
+}
+
+/* 知っておくと安心なこと（入力欄ごとの説明） */
+.hearing-note {
+    padding: 1.25rem 1.5rem;
+    border-left: 4px solid var(--hearing-color-accent-soft);
+    border-radius: 0.25rem;
+    background-color: var(--color-background-sub);
+}
+
+.hearing-note__title {
+    margin-bottom: 0.75rem;
+    font-family: var(--font-heading);
+    font-size: var(--hearing-font-size-note-title);
+}
+
+.hearing-note__list {
+    margin-bottom: 0.75rem;
+    padding-left: 1.25rem;
+}
+
+.hearing-note__list li + li {
+    margin-top: 0.5rem;
+}
+
+/* 背景（--color-background-sub）の上でも読める濃さにするため、補足の灰色ではなく本文の色を使う */
+.hearing-note__source {
+    margin-bottom: 0;
+    color: var(--color-text);
+    font-size: var(--font-size-small);
+}
+
+/* タブレット・スマホ：入力欄の下に説明を置く */
+@media (max-width: 991.98px) {
+    .hearing-basic {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 1.5rem;
+    }
+}
+
+/* ===== STEP4（P-09）：タグ選択 ===== */
+
+/* 「決められないこと」（左）と「こだわりたいこと」（右）を横に並べる（PC 基準）。狭い画面では縦に積む */
+.hearing-tags {
+    /* STEP4 だけで使う値 */
+    --hearing-font-size-tag-title: 1.125rem;
+    --hearing-color-badge: #80571f;
+    --hearing-color-badge-soft: #fbf3e6;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 2rem;
+}
+
+.hearing-tags__group {
+    min-width: 0;
+    margin: 0;
+    padding: 1.5rem;
+    border: 1px solid var(--hearing-color-rule);
+    border-radius: var(--hearing-radius);
+    background-color: var(--hearing-color-surface);
+}
+
+.hearing-tags__title {
+    float: none;
+    width: auto;
+    margin-bottom: 0.25rem;
+    font-family: var(--font-heading);
+    font-size: var(--hearing-font-size-tag-title);
+}
+
+.hearing-tags__lead {
+    margin-bottom: 1rem;
+    color: var(--color-text-sub);
+    font-size: var(--font-size-small);
+}
+
+/* タグは2列に並べる */
+.hearing-tags__list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.hearing-tag {
+    display: block;
+    cursor: pointer;
+}
+
+.hearing-tag__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    height: 100%;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--hearing-color-rule);
+    border-radius: var(--hearing-radius);
+    background-color: var(--color-surface);
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.hearing-tag:hover .hearing-tag__body {
+    border-color: var(--hearing-color-accent);
+}
+
+/* 選んだタグ */
+.hearing-tag__input:checked + .hearing-tag__body {
+    border-color: var(--hearing-color-accent);
+    background-color: var(--hearing-color-accent-soft);
+}
+
+/* 選んだタグの背景（--hearing-color-accent-soft）の上では補足の灰色が薄すぎるので、説明文を本文の色にする */
+.hearing-tag__input:checked + .hearing-tag__body .hearing-tag__description {
+    color: var(--color-text);
+}
+
+.hearing-tag__input:focus-visible + .hearing-tag__body {
+    outline: 3px solid var(--color-main);
+    outline-offset: 2px;
+}
+
+.hearing-tag__name {
+    font-weight: 700;
+}
+
+/* 選んだタグの名前の前に印を付ける（色だけに頼らず、選んだことがわかるように） */
+.hearing-tag__input:checked + .hearing-tag__body .hearing-tag__name::before {
+    content: "✓ ";
+    /* 読み上げでは印を読ませない（この書き方に対応していないブラウザは、上の行を使う） */
+    content: "✓ " / "";
+    color: var(--hearing-color-accent);
+}
+
+.hearing-tag__description {
+    color: var(--color-text-sub);
+    font-size: var(--font-size-small);
+    line-height: 1.5;
+}
+
+/* 「おすすめ」の印（hearing.js が hidden を外す） */
+.hearing-tag__badge {
+    align-self: flex-start;
+    margin-top: 0.25rem;
+    padding: 0 0.5rem;
+    border-radius: 999px;
+    background-color: var(--hearing-color-badge-soft);
+    color: var(--hearing-color-badge);
+    font-size: var(--font-size-small);
+    font-weight: 700;
+}
+
+.hearing-tag__badge[hidden] {
+    display: none;
+}
+
+.hearing-tags__hint {
+    margin: 1rem 0 0;
+    color: var(--color-text);
+    font-size: var(--font-size-small);
+}
+
+.hearing-tags__hint[hidden] {
+    display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hearing-tag__body {
+        transition: none;
+    }
+}
+
+/* タブレット：2つのグループを縦に積む */
+@media (max-width: 991.98px) {
+    .hearing-tags {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 1.5rem;
+    }
+}
+
+/* スマホ：タグも1列にする */
+@media (max-width: 575.98px) {
+    .hearing-tags__list {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

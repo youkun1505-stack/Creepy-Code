@@ -31,7 +31,7 @@ public class HearingController {
     private static final String URL_STEP1 = "/hearing/step1";
     private static final String URL_STEP2 = "/hearing/step2";
     private static final String URL_STEP2_RESULT = "/hearing/step2/result";
-    // TODO: STEP3（P-08）の画面を作ったら、その URL と合っているか確かめる（しょたこん）
+    // STEP3（P-08）の日程のページ（HearingBasicInfoController）
     private static final String URL_STEP3 = "/hearing/step3";
     private static final String CHOICE_ERROR = "1つ選んでください";
     // 進み具合に出す、4つのステップの名前
@@ -119,8 +119,11 @@ public class HearingController {
         model.addAttribute("currentStep", currentStep);
     }
 
-    /** いまのステップ（1 始まり）に合わせて、進み具合の 済み／いまここ／まだ を組み立てる。 */
-    private static List<ProgressStep> buildProgressSteps(int currentStep) {
+    /**
+     * いまのステップ（1 始まり）に合わせて、進み具合の 済み／いまここ／まだ を組み立てる。
+     * STEP3 の HearingBasicInfoController からも使うので、同じパッケージから呼べるようにしている。
+     */
+    static List<ProgressStep> buildProgressSteps(int currentStep) {
         List<ProgressStep> steps = new ArrayList<>();
         for (int i = 0; i < HEARING_STEPS.size(); i++) {
             int stepNumber = i + 1;
