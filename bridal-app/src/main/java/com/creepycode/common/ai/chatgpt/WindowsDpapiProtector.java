@@ -12,7 +12,7 @@ import java.util.concurrent.TimeoutException;
 
 /**
  * Windows の DPAPI（ログインしている Windows ユーザーの鍵で暗号化する機能）を、PowerShell 経由で使う。
- * 追加のライブラリは入れず、Windows に最初から入っている PowerShell を呼ぶ（ai-relay の dpapi.mjs と同じ方式）。
+ * 追加のライブラリは入れず、Windows に最初から入っている PowerShell を呼ぶ（以前の Node.js 版と同じ方式）。
  * データは標準入力で渡す（コマンドの引数に書くと、ほかのプログラムから見えてしまうため）。
  */
 public class WindowsDpapiProtector implements CredentialProtector {

@@ -13,6 +13,8 @@ public record ChatGptEndpoints(String authorizeUrl, String tokenUrl) {
 
     public static final String OFFICIAL_AUTHORIZE_URL = "https://auth.openai.com/api/accounts/authorize";
     public static final String OFFICIAL_TOKEN_URL = "https://auth.openai.com/api/accounts/oauth/token";
+    /** AI を呼ぶ Responses API の URL（公式）。ChatGptAiClient が使う。 */
+    public static final String OFFICIAL_RESPONSES_URL = "https://api.openai.com/v1/responses";
 
     public ChatGptEndpoints {
         Objects.requireNonNull(authorizeUrl, "authorizeUrl");
