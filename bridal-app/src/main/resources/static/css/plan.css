@@ -1,0 +1,159 @@
+/* プラン（P-11 AIプラン生成中・P-12 マイプラン）専用のスタイル */
+/* 全画面共通の色・文字サイズは common.css の変数を使い、プランの画面だけで使う値はここの変数にまとめる */
+.plan-page {
+    --plan-color-accent: var(--color-main-dark);
+    --plan-color-accent-hover: #744a54;
+    --plan-color-accent-soft: var(--color-main-soft);
+    --plan-color-rule: var(--color-rule);
+    --plan-color-surface: #fffbfb;
+    --plan-color-error: #b02a37;
+    --plan-color-error-soft: #fbeaec;
+    --plan-font-size-title: 1.75rem;
+    --plan-radius: 0.75rem;
+    --plan-spinner-size: 3rem;
+}
+
+/* 横幅は Bootstrap の .container（ヘッダーと同じ）に任せる */
+main.plan-page {
+    padding-top: 2rem;
+    padding-bottom: 4rem;
+    line-height: 1.8;
+    letter-spacing: 0.02em;
+}
+
+.plan-title {
+    margin: 0 0 1rem;
+    color: var(--plan-color-accent);
+    font-family: var(--font-heading);
+    font-size: var(--plan-font-size-title);
+    font-weight: 700;
+}
+
+.plan-lead {
+    margin: 0 0 2rem;
+    color: var(--color-text);
+}
+
+/* ---- P-11 AIプラン生成中 ---- */
+
+.plan-generating__status {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    max-width: 32rem;
+    margin: 0 auto 2rem;
+    padding: 2.5rem 1.5rem;
+    border: 1px solid var(--plan-color-rule);
+    border-radius: var(--plan-radius);
+    background-color: var(--plan-color-surface);
+    text-align: center;
+}
+
+.plan-generating__spinner {
+    width: var(--plan-spinner-size);
+    height: var(--plan-spinner-size);
+    border: 3px solid var(--plan-color-accent-soft);
+    border-top-color: var(--plan-color-accent);
+    border-radius: 50%;
+    animation: plan-spin 1.1s linear infinite;
+}
+
+/* display を決めているので、hidden で隠れるよう自前でも指定する（Bootstrap の指定に頼らない） */
+.plan-generating__status[hidden] {
+    display: none;
+}
+
+/* 作り終わったときは、くるくるを止める */
+.plan-generating__status.is-stopped .plan-generating__spinner {
+    animation: none;
+    opacity: 0.4;
+}
+
+.plan-generating__message {
+    margin: 0;
+    color: var(--plan-color-accent);
+    font-weight: 700;
+}
+
+@keyframes plan-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* 動きを減らす設定の人には、回さずにゆっくり点滅させる */
+@media (prefers-reduced-motion: reduce) {
+    .plan-generating__spinner {
+        animation: plan-pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes plan-pulse {
+        50% {
+            opacity: 0.4;
+        }
+    }
+}
+
+/* 案内（時間がかかっている・失敗した） */
+.plan-notice {
+    max-width: 32rem;
+    margin: 0 auto 1.5rem;
+    padding: 1.25rem 1.5rem;
+    border: 1px solid var(--plan-color-rule);
+    border-radius: var(--plan-radius);
+    background-color: var(--color-surface);
+}
+
+.plan-notice--error {
+    border-color: var(--plan-color-error);
+    background-color: var(--plan-color-error-soft);
+}
+
+.plan-notice__text {
+    margin: 0 0 1rem;
+}
+
+.plan-notice__text:last-child {
+    margin-bottom: 0;
+}
+
+/* ボタン（Bootstrap の .btn を土台に、色だけ合わせる） */
+.plan-button--primary {
+    border-color: var(--plan-color-accent);
+    background-color: var(--plan-color-accent);
+    color: #ffffff;
+}
+
+.plan-button--primary:hover,
+.plan-button--primary:focus-visible {
+    border-color: var(--plan-color-accent-hover);
+    background-color: var(--plan-color-accent-hover);
+    color: #ffffff;
+}
+
+.plan-button--secondary {
+    border-color: var(--plan-color-accent);
+    background-color: var(--color-surface);
+    color: var(--plan-color-accent);
+}
+
+.plan-button--secondary:hover,
+.plan-button--secondary:focus-visible {
+    background-color: var(--plan-color-accent-soft);
+    color: var(--plan-color-accent);
+}
+
+.plan-back {
+    margin: 2rem 0 0;
+    text-align: center;
+}
+
+.plan-back a {
+    color: var(--plan-color-accent);
+}
+
+.plan-back a:hover,
+.plan-back a:focus-visible {
+    color: var(--plan-color-accent-hover);
+}

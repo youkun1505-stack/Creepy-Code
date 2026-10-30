@@ -79,6 +79,18 @@ class PlanGenerationServiceTest {
     }
 
     @Test
+    void STEP4まで答えていればプランを作れる_0個のタグでもよい() {
+        when(answerRepository.findFirstByUserIdOrderByCreatedAtDesc(USER_ID)).thenReturn(Optional.empty());
+        assertThat(service.isReady(USER_ID)).isFalse();
+
+        latestAnswer(10L, null);
+        assertThat(service.isReady(USER_ID)).isFalse();
+
+        latestAnswer(10L, "");
+        assertThat(service.isReady(USER_ID)).isTrue();
+    }
+
+    @Test
     void 回答が無ければ作らない() {
         when(answerRepository.findFirstByUserIdOrderByCreatedAtDesc(USER_ID)).thenReturn(Optional.empty());
 

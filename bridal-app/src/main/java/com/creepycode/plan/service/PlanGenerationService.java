@@ -50,6 +50,13 @@ public class PlanGenerationService {
         this.conversationLogService = conversationLogService;
     }
 
+    /** プランを作れる（STEP4 まで答えている＝いちばん新しい回答の UNDECIDED_TAGS が NULL でない）かを返す。 */
+    public boolean isReady(Long userId) {
+        return answerRepository.findFirstByUserIdOrderByCreatedAtDesc(userId)
+                .map(answer -> answer.getUndecidedTags() != null)
+                .orElse(false);
+    }
+
     /**
      * 顧客のいちばん新しい回答から、プランの大枠と価値観の要点を作って保存する。
      * - STEP4 まで答えていない（UNDECIDED_TAGS が NULL）ときは作らない（NOT_READY）
