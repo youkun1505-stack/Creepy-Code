@@ -37,6 +37,8 @@ import com.creepycode.auth.service.RegisterService;
 import com.creepycode.common.controller.TopController;
 import com.creepycode.hearing.controller.DeepDiveController;
 import com.creepycode.hearing.service.AiChatService;
+import com.creepycode.plan.dto.HubState;
+import com.creepycode.plan.service.HubStateService;
 
 /**
  * ページの守り（基本設計書 8-1・8-2）のテスト。
@@ -68,12 +70,17 @@ class SecurityConfigTest {
     @MockitoBean
     private UserDetailsService userDetailsService;
 
+    // トップページ（TopController）のハブが使う。ここでは「まだ何も答えていない」顧客として返す
+    @MockitoBean
+    private HubStateService hubStateService;
+
     @BeforeEach
     void setUp() {
         when(loginService.homeUrl(UserRole.CUSTOMER)).thenReturn("/");
         when(loginService.homeUrl(UserRole.PLANNER)).thenReturn("/planner/dashboard");
         when(loginService.homeUrl(UserRole.ADMIN)).thenReturn("/admin/dashboard");
         when(aiChatService.findHistory(anyLong())).thenReturn(List.of());
+        when(hubStateService.findState(anyLong())).thenReturn(new HubState(HubState.Stage.NEW, null, false));
     }
 
     @Test
