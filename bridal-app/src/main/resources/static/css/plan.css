@@ -157,3 +157,178 @@ main.plan-page {
 .plan-back a:focus-visible {
     color: var(--plan-color-accent-hover);
 }
+
+/* ---- P-12 マイプラン ---- */
+
+.plan-myplan__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem 1.5rem;
+}
+
+.plan-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 0 1rem;
+}
+
+.plan-status__label {
+    color: var(--color-text-sub);
+    font-size: var(--font-size-small);
+}
+
+.plan-status__value {
+    padding: 0.125rem 0.875rem;
+    border-radius: 999px;
+    background-color: var(--plan-color-accent-soft);
+    color: var(--plan-color-accent);
+    font-weight: 700;
+}
+
+.plan-notice--changed {
+    max-width: none;
+    margin: 0 0 2rem;
+    border-color: var(--plan-color-accent);
+    background-color: var(--plan-color-surface);
+}
+
+.plan-notice__sub {
+    color: var(--color-text-sub);
+    font-size: var(--font-size-small);
+}
+
+/* PC：左に大枠、右に価値観の要点（発表は PC なので PC を基準にする） */
+.plan-myplan__body {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    gap: 2rem;
+    align-items: start;
+}
+
+.plan-section-title {
+    margin: 0 0 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--plan-color-rule);
+    color: var(--plan-color-accent);
+    font-family: var(--font-heading);
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.plan-draft__list {
+    display: grid;
+    gap: 1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.plan-draft__item {
+    padding: 1.25rem 1.5rem;
+    border: 1px solid var(--plan-color-rule);
+    border-radius: var(--plan-radius);
+    background-color: var(--color-surface);
+}
+
+.plan-draft__label {
+    margin: 0 0 0.5rem;
+    color: var(--plan-color-accent);
+    font-family: var(--font-heading);
+    font-size: 1.125rem;
+    font-weight: 700;
+}
+
+/* AI の文の改行をそのまま見せる */
+.plan-draft__proposal {
+    margin: 0 0 0.75rem;
+    white-space: pre-line;
+}
+
+.plan-draft__reason {
+    margin: 0;
+    padding-top: 0.75rem;
+    border-top: 1px dashed var(--plan-color-rule);
+    color: var(--color-text-sub);
+    font-size: var(--font-size-small);
+}
+
+/* 理由の文の改行だけをそのまま見せる（HTML の字下げの改行は見せない） */
+.plan-draft__reason-text {
+    white-space: pre-line;
+}
+
+.plan-draft__reason-label {
+    display: block;
+    color: var(--plan-color-accent);
+    font-weight: 700;
+}
+
+/* 右の価値観の要点は、スクロールしても見えるようにする */
+.plan-values {
+    position: sticky;
+    top: 1.5rem;
+    padding: 1.25rem 1.5rem;
+    border: 1px solid var(--plan-color-rule);
+    border-radius: var(--plan-radius);
+    background-color: var(--plan-color-surface);
+}
+
+.plan-values__title {
+    margin: 1.25rem 0 0.5rem;
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.plan-values .plan-section-title + .plan-values__title {
+    margin-top: 0;
+}
+
+.plan-values__list,
+.plan-values__order {
+    margin: 0;
+    padding-left: 1.25rem;
+}
+
+.plan-values__list li,
+.plan-values__order li {
+    margin-bottom: 0.5rem;
+}
+
+.plan-values__item {
+    display: block;
+    font-weight: 700;
+}
+
+.plan-values__reason {
+    display: block;
+    color: var(--color-text-sub);
+    font-size: var(--font-size-small);
+}
+
+.plan-values__none {
+    margin: 0;
+    color: var(--color-text-sub);
+    font-size: var(--font-size-small);
+}
+
+.plan-note {
+    margin: 2.5rem 0 0;
+    color: var(--color-text-sub);
+    font-size: var(--font-size-small);
+    text-align: center;
+}
+
+/* タブレット・スマホ：1列にして、価値観の要点を大枠の上に出す */
+@media (max-width: 991.98px) {
+    .plan-myplan__body {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .plan-values {
+        position: static;
+        order: -1;
+    }
+}
