@@ -30,9 +30,11 @@ public class HearingTagService {
     private static final String RELATED_SEPARATOR = " ";
 
     private final OnboardingAnswerRepository answerRepository;
+    private final HearingAnswerEditService answerEditService;
 
-    public HearingTagService(OnboardingAnswerRepository answerRepository) {
+    public HearingTagService(OnboardingAnswerRepository answerRepository, HearingAnswerEditService answerEditService) {
         this.answerRepository = answerRepository;
+        this.answerEditService = answerEditService;
     }
 
     /**
@@ -70,7 +72,8 @@ public class HearingTagService {
         if (found.isEmpty()) {
             return false;
         }
-        OnboardingAnswer answer = found.get();
+        // プランの元になった回答は書き換えず、コピーした新しい行に入れる（HearingAnswerEditService）
+        OnboardingAnswer answer = answerEditService.findAnswerForEdit(userId).orElse(found.get());
         answer.setUndecidedTags(toLabels(Group.UNDECIDED, undecidedKeys));
         answer.setDecidedTags(toLabels(Group.DECIDED, decidedKeys));
         answerRepository.save(answer);

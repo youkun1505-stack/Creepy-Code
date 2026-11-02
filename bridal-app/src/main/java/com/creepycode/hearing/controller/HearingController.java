@@ -11,9 +11,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.creepycode.auth.service.LoginUser;
 import com.creepycode.hearing.dto.VisualSummaryView;
+import com.creepycode.hearing.service.HearingAnswerEditService;
 import com.creepycode.hearing.service.HearingService;
 import com.creepycode.hearing.service.HearingVisualService;
 
@@ -43,15 +45,22 @@ public class HearingController {
 
     private final HearingService hearingService;
     private final HearingVisualService hearingVisualService;
+    private final HearingAnswerEditService answerEditService;
 
-    public HearingController(HearingService hearingService, HearingVisualService hearingVisualService) {
+    public HearingController(HearingService hearingService, HearingVisualService hearingVisualService,
+            HearingAnswerEditService answerEditService) {
         this.hearingService = hearingService;
         this.hearingVisualService = hearingVisualService;
+        this.answerEditService = answerEditService;
     }
 
     /** STEP1「どんな式にしたい？」を表示する。前に選んだものがあれば、選ばれた状態で出す。 */
     @GetMapping("/step1")
-    public String showStep1(@AuthenticationPrincipal LoginUser loginUser, Model model) {
+    public String showStep1(@AuthenticationPrincipal LoginUser loginUser, Model model,
+            RedirectAttributes redirectAttributes) {
+        if (answerEditService.isLocked(loginUser.getUserId())) {
+            return HearingLock.redirectToHub(redirectAttributes);
+        }
         String selectedChoice = hearingService.findSelectedChoice(loginUser.getUserId()).orElse(null);
         addStep1Attributes(model, selectedChoice);
         return VIEW_STEP1;
@@ -60,7 +69,11 @@ public class HearingController {
     /** STEP1 の選択を保存して STEP2 へ進める。選ばれていないときは、同じ画面にメッセージを出す。 */
     @PostMapping("/step1")
     public String saveStep1(@AuthenticationPrincipal LoginUser loginUser,
-            @RequestParam(name = "choice", required = false) String choice, Model model) {
+            @RequestParam(name = "choice", required = false) String choice, Model model,
+            RedirectAttributes redirectAttributes) {
+        if (answerEditService.isLocked(loginUser.getUserId())) {
+            return HearingLock.redirectToHub(redirectAttributes);
+        }
         if (!hearingService.saveArchetypeChoice(loginUser.getUserId(), choice)) {
             addStep1Attributes(model, null);
             model.addAttribute("choiceError", CHOICE_ERROR);
@@ -74,7 +87,11 @@ public class HearingController {
      * 1回目（テイストごとに1枚）と2回目（好きなテイストの掘り下げ）の画像をまとめて渡し、出し分けは JS で行う。
      */
     @GetMapping("/step2")
-    public String showStep2(@AuthenticationPrincipal LoginUser loginUser, Model model) {
+    public String showStep2(@AuthenticationPrincipal LoginUser loginUser, Model model,
+            RedirectAttributes redirectAttributes) {
+        if (answerEditService.isLocked(loginUser.getUserId())) {
+            return HearingLock.redirectToHub(redirectAttributes);
+        }
         if (!hearingVisualService.hasAnsweredStep1(loginUser.getUserId())) {
             return "redirect:" + URL_STEP1;
         }
@@ -86,7 +103,11 @@ public class HearingController {
     /** STEP2 で「好き」を選んだ画像を保存し、まとめへ進める。STEP1 をまだ答えていなければ STEP1 へ戻す。 */
     @PostMapping("/step2")
     public String saveStep2(@AuthenticationPrincipal LoginUser loginUser,
-            @RequestParam(name = "liked", required = false) List<String> liked) {
+            @RequestParam(name = "liked", required = false) List<String> liked,
+            RedirectAttributes redirectAttributes) {
+        if (answerEditService.isLocked(loginUser.getUserId())) {
+            return HearingLock.redirectToHub(redirectAttributes);
+        }
         if (!hearingVisualService.saveVisualSelections(loginUser.getUserId(), liked)) {
             return "redirect:" + URL_STEP1;
         }
@@ -95,7 +116,11 @@ public class HearingController {
 
     /** STEP2 のまとめ（好みの傾向）を表示する。STEP2 をまだ答えていなければ STEP2 へ戻す。 */
     @GetMapping("/step2/result")
-    public String showStep2Result(@AuthenticationPrincipal LoginUser loginUser, Model model) {
+    public String showStep2Result(@AuthenticationPrincipal LoginUser loginUser, Model model,
+            RedirectAttributes redirectAttributes) {
+        if (answerEditService.isLocked(loginUser.getUserId())) {
+            return HearingLock.redirectToHub(redirectAttributes);
+        }
         Optional<VisualSummaryView> summary = hearingVisualService.findVisualSummary(loginUser.getUserId());
         if (summary.isEmpty()) {
             return "redirect:" + URL_STEP2;

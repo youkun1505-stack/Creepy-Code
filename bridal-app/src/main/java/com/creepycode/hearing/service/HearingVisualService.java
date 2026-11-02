@@ -54,10 +54,13 @@ public class HearingVisualService {
     private final OnboardingAnswerRepository answerRepository;
     private final VisualImageRepository visualImageRepository;
     private final ObjectMapper objectMapper;
+    private final HearingAnswerEditService answerEditService;
 
     public HearingVisualService(OnboardingAnswerRepository answerRepository,
-            VisualImageRepository visualImageRepository, ObjectMapper objectMapper) {
+            VisualImageRepository visualImageRepository, ObjectMapper objectMapper,
+            HearingAnswerEditService answerEditService) {
         this.answerRepository = answerRepository;
+        this.answerEditService = answerEditService;
         this.visualImageRepository = visualImageRepository;
         this.objectMapper = objectMapper;
     }
@@ -118,7 +121,8 @@ public class HearingVisualService {
         TreeSet<Long> likedIds = new TreeSet<>();
         visualImageRepository.findAllById(requestedIds).forEach(image -> likedIds.add(image.getImageId()));
 
-        OnboardingAnswer answer = found.get();
+        // プランの元になった回答は書き換えず、コピーした新しい行に入れる（HearingAnswerEditService）
+        OnboardingAnswer answer = answerEditService.findAnswerForEdit(userId).orElse(found.get());
         answer.setVisualSelections(toJson(likedIds));
         answerRepository.save(answer);
         return true;

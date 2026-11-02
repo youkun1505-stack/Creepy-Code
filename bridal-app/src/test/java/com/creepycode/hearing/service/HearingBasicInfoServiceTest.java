@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -17,11 +18,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.creepycode.hearing.entity.OnboardingAnswer;
 import com.creepycode.hearing.repository.OnboardingAnswerRepository;
 import com.creepycode.hearing.service.HearingBasicInfoService.SaveResult;
 import com.creepycode.hearing.service.HearingBasicInfoService.SaveStatus;
+import com.creepycode.plan.entity.Plan;
+import com.creepycode.plan.entity.PlanStatus;
+import com.creepycode.plan.repository.PlanRepository;
 
 /**
  * かんたん質問 STEP3（HearingBasicInfoService）のテスト。DB は使わず、Repository は偽物にする。
@@ -34,13 +40,16 @@ class HearingBasicInfoServiceTest {
     private static final LocalDate TODAY = LocalDate.of(2026, 10, 28);
 
     private OnboardingAnswerRepository answerRepository;
+    // プラン（PLANS）。既定では無し（回答はそのまま書き換える）
+    private final PlanRepository planRepository = mock(PlanRepository.class);
     private HearingBasicInfoService service;
 
     @BeforeEach
     void setUp() {
         answerRepository = mock(OnboardingAnswerRepository.class);
         Clock clock = Clock.fixed(TODAY.atStartOfDay(ZONE_JAPAN).plusHours(12).toInstant(), ZONE_JAPAN);
-        service = new HearingBasicInfoService(answerRepository, clock);
+        service = new HearingBasicInfoService(answerRepository,
+                new HearingAnswerEditService(answerRepository, planRepository), clock);
     }
 
     /** STEP1・STEP2 まで答えた回答を、いちばん新しい回答として返すようにする。 */
@@ -305,5 +314,46 @@ class HearingBasicInfoServiceTest {
 
         assertThat(result).isEqualTo(SaveResult.invalid(HearingBasicInfoService.BUDGET_OUT_OF_RANGE));
         verify(answerRepository, never()).save(any());
+    }
+
+    // ---- プランを作った後の書き換え（プランの元の回答は変えず、コピーした新しい行に入れる） ----
+
+    @Test
+    void プランの元の回答なら_コピーした新しい行に保存し_元の行は変えない() {
+        OnboardingAnswer answer = givenStep2Answered();
+        givenPlanOf(answer, PlanStatus.CUSTOMER_DRAFT_REVIEW);
+
+        SaveResult result = service.saveBudget(USER_ID, "300", false);
+
+        assertThat(result.status()).isEqualTo(SaveStatus.SAVED);
+        assertThat(answer.getBudget()).isNull();
+        ArgumentCaptor<OnboardingAnswer> saved = ArgumentCaptor.forClass(OnboardingAnswer.class);
+        verify(answerRepository, times(2)).save(saved.capture());
+        OnboardingAnswer copy = saved.getAllValues().get(1);
+        assertThat(copy).isNotSameAs(answer);
+        assertThat(copy.getBudget()).isEqualTo(3_000_000);
+        assertThat(copy.getArchetypeId()).isEqualTo(3L);
+    }
+
+    @Test
+    void 入力が誤りなら_コピーも作らない() {
+        OnboardingAnswer answer = givenStep2Answered();
+        givenPlanOf(answer, PlanStatus.CUSTOMER_DRAFT_REVIEW);
+
+        SaveResult result = service.saveDesiredDate(USER_ID, "", false);
+
+        assertThat(result.status()).isEqualTo(SaveStatus.INVALID);
+        verify(answerRepository, never()).save(any());
+    }
+
+    /** いちばん新しい回答（ANSWER_ID が 10）を元にしたプランがある状態にする。保存は渡した行をそのまま返す。 */
+    private void givenPlanOf(OnboardingAnswer answer, PlanStatus status) {
+        ReflectionTestUtils.setField(answer, "answerId", 10L);
+        Plan plan = new Plan();
+        plan.setUserId(USER_ID);
+        plan.setAnswerId(10L);
+        plan.setStatus(status);
+        when(planRepository.findFirstByUserIdOrderByCreatedAtDesc(USER_ID)).thenReturn(Optional.of(plan));
+        when(answerRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 }

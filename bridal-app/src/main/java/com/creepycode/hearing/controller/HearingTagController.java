@@ -9,8 +9,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.creepycode.auth.service.LoginUser;
+import com.creepycode.hearing.service.HearingAnswerEditService;
 import com.creepycode.hearing.service.HearingTag.Group;
 import com.creepycode.hearing.service.HearingTagService;
 
@@ -29,14 +31,20 @@ public class HearingTagController {
     private static final int CURRENT_STEP = 4;
 
     private final HearingTagService tagService;
+    private final HearingAnswerEditService answerEditService;
 
-    public HearingTagController(HearingTagService tagService) {
+    public HearingTagController(HearingTagService tagService, HearingAnswerEditService answerEditService) {
         this.tagService = tagService;
+        this.answerEditService = answerEditService;
     }
 
     /** STEP4 を表示する。STEP2 をまだ答えていなければ STEP2 へ戻す。保存したタグがあれば選ばれた状態で出す。 */
     @GetMapping
-    public String showStep4(@AuthenticationPrincipal LoginUser loginUser, Model model) {
+    public String showStep4(@AuthenticationPrincipal LoginUser loginUser, Model model,
+            RedirectAttributes redirectAttributes) {
+        if (answerEditService.isLocked(loginUser.getUserId())) {
+            return HearingLock.redirectToHub(redirectAttributes);
+        }
         Long userId = loginUser.getUserId();
         if (!tagService.hasAnsweredStep2(userId)) {
             return "redirect:" + URL_STEP2;
@@ -52,7 +60,11 @@ public class HearingTagController {
     @PostMapping
     public String saveStep4(@AuthenticationPrincipal LoginUser loginUser,
             @RequestParam(name = "undecided", required = false) List<String> undecided,
-            @RequestParam(name = "decided", required = false) List<String> decided) {
+            @RequestParam(name = "decided", required = false) List<String> decided,
+            RedirectAttributes redirectAttributes) {
+        if (answerEditService.isLocked(loginUser.getUserId())) {
+            return HearingLock.redirectToHub(redirectAttributes);
+        }
         if (!tagService.saveTags(loginUser.getUserId(), undecided, decided)) {
             return "redirect:" + URL_STEP2;
         }

@@ -13,6 +13,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
@@ -38,6 +39,7 @@ import com.creepycode.hearing.dto.VisualImageView;
 import com.creepycode.hearing.dto.VisualQuestionView;
 import com.creepycode.hearing.dto.VisualSummaryView;
 import com.creepycode.hearing.dto.VisualSummaryView.TasteResult;
+import com.creepycode.hearing.service.HearingAnswerEditService;
 import com.creepycode.hearing.service.HearingService;
 import com.creepycode.hearing.service.HearingVisualService;
 
@@ -68,6 +70,10 @@ class HearingStep2ControllerTest {
     // SecurityConfig が使う（このテストではログインの確かめはしないので、偽物でよい）
     @MockitoBean
     private UserDetailsService userDetailsService;
+
+    // プランナーに送った後かの確かめ（ここでは送っていない＝false を返す偽物）
+    @MockitoBean
+    private HearingAnswerEditService answerEditService;
 
     @BeforeEach
     void setUp() {
@@ -196,5 +202,24 @@ class HearingStep2ControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("ピンとくる写真がなかったようです")))
                 .andExpect(content().string(not(containsString("が好きなようです"))));
+    }
+
+    @Test
+    void プランナーに送った後は_STEP2とまとめを開いても保存しても_ハブへ戻して知らせを出す() throws Exception {
+        when(answerEditService.isLocked(1L)).thenReturn(true);
+
+        mockMvc.perform(get("/hearing/step2").with(user(CUSTOMER)))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/"))
+                .andExpect(flash().attribute("flashMessage", HearingAnswerEditService.LOCKED_MESSAGE));
+        mockMvc.perform(post("/hearing/step2").with(user(CUSTOMER)).with(csrf()).param("liked", "1"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/"))
+                .andExpect(flash().attribute("flashMessage", HearingAnswerEditService.LOCKED_MESSAGE));
+        mockMvc.perform(get("/hearing/step2/result").with(user(CUSTOMER)))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/"))
+                .andExpect(flash().attribute("flashMessage", HearingAnswerEditService.LOCKED_MESSAGE));
+        verify(hearingVisualService, never()).saveVisualSelections(anyLong(), any());
     }
 }

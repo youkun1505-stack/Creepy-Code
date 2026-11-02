@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -16,11 +17,16 @@ import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.creepycode.hearing.dto.TagView;
 import com.creepycode.hearing.entity.OnboardingAnswer;
 import com.creepycode.hearing.repository.OnboardingAnswerRepository;
 import com.creepycode.hearing.service.HearingTag.Group;
+import com.creepycode.plan.entity.Plan;
+import com.creepycode.plan.entity.PlanStatus;
+import com.creepycode.plan.repository.PlanRepository;
 
 /**
  * かんたん質問 STEP4（HearingTagService・HearingTag）のテスト。DB は使わず、Repository は偽物にする。
@@ -30,12 +36,15 @@ class HearingTagServiceTest {
     private static final Long USER_ID = 1L;
 
     private OnboardingAnswerRepository answerRepository;
+    // プラン（PLANS）。既定では無し（回答はそのまま書き換える）
+    private final PlanRepository planRepository = mock(PlanRepository.class);
     private HearingTagService service;
 
     @BeforeEach
     void setUp() {
         answerRepository = mock(OnboardingAnswerRepository.class);
-        service = new HearingTagService(answerRepository);
+        service = new HearingTagService(answerRepository,
+                new HearingAnswerEditService(answerRepository, planRepository));
     }
 
     /** STEP1・STEP2 まで答えた回答を、いちばん新しい回答として返すようにする。 */
@@ -234,5 +243,34 @@ class HearingTagServiceTest {
 
         assertThat(saved).isFalse();
         verify(answerRepository, never()).save(any());
+    }
+
+    // ---- プランを作った後の書き換え（プランの元の回答は変えず、コピーした新しい行に入れる） ----
+
+    @Test
+    void プランの元の回答なら_タグはコピーした新しい行に保存し_元の行は変えない() {
+        OnboardingAnswer answer = givenStep2Answered();
+        answer.setUndecidedTags("");
+        answer.setDecidedTags("");
+        givenPlanOf(answer, PlanStatus.CUSTOMER_DRAFT_REVIEW);
+
+        assertThat(service.saveTags(USER_ID, List.of("u-venue"), List.of())).isTrue();
+
+        assertThat(answer.getUndecidedTags()).isEmpty();
+        ArgumentCaptor<OnboardingAnswer> saved = ArgumentCaptor.forClass(OnboardingAnswer.class);
+        verify(answerRepository, times(2)).save(saved.capture());
+        assertThat(saved.getAllValues().get(1)).isNotSameAs(answer);
+        assertThat(saved.getAllValues().get(1).getUndecidedTags()).isEqualTo("会場");
+    }
+
+    /** いちばん新しい回答（ANSWER_ID が 10）を元にしたプランがある状態にする。保存は渡した行をそのまま返す。 */
+    private void givenPlanOf(OnboardingAnswer answer, PlanStatus status) {
+        ReflectionTestUtils.setField(answer, "answerId", 10L);
+        Plan plan = new Plan();
+        plan.setUserId(USER_ID);
+        plan.setAnswerId(10L);
+        plan.setStatus(status);
+        when(planRepository.findFirstByUserIdOrderByCreatedAtDesc(USER_ID)).thenReturn(Optional.of(plan));
+        when(answerRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 }

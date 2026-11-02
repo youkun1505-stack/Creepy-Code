@@ -22,11 +22,13 @@ public class HearingService {
 
     private final OnboardingAnswerRepository answerRepository;
     private final ArchetypeMasterRepository archetypeRepository;
+    private final HearingAnswerEditService answerEditService;
 
     public HearingService(OnboardingAnswerRepository answerRepository,
-            ArchetypeMasterRepository archetypeRepository) {
+            ArchetypeMasterRepository archetypeRepository, HearingAnswerEditService answerEditService) {
         this.answerRepository = answerRepository;
         this.archetypeRepository = archetypeRepository;
+        this.answerEditService = answerEditService;
     }
 
     /**
@@ -61,8 +63,8 @@ public class HearingService {
         if (archetypeId.isEmpty()) {
             return false;
         }
-        // TODO: プラン（PLANS）を作ったあとの回答は書き換えず、新しい回答を作る。プランの機能を作るときに直す（しょたこん）
-        OnboardingAnswer answer = answerRepository.findFirstByUserIdOrderByCreatedAtDesc(userId)
+        // プランの元になった回答は書き換えず、コピーした新しい行に入れる（HearingAnswerEditService）
+        OnboardingAnswer answer = answerEditService.findAnswerForEdit(userId)
                 .orElseGet(() -> createAnswer(userId));
         answer.setArchetypeId(archetypeId.get());
         answerRepository.save(answer);

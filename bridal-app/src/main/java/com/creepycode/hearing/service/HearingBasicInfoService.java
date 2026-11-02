@@ -74,16 +74,20 @@ public class HearingBasicInfoService {
     }
 
     private final OnboardingAnswerRepository answerRepository;
+    private final HearingAnswerEditService answerEditService;
     private final Clock clock;
 
     @Autowired
-    public HearingBasicInfoService(OnboardingAnswerRepository answerRepository) {
-        this(answerRepository, Clock.system(ZONE_JAPAN));
+    public HearingBasicInfoService(OnboardingAnswerRepository answerRepository,
+            HearingAnswerEditService answerEditService) {
+        this(answerRepository, answerEditService, Clock.system(ZONE_JAPAN));
     }
 
     /** テスト用。「今日」を決めた時計で動かす。 */
-    HearingBasicInfoService(OnboardingAnswerRepository answerRepository, Clock clock) {
+    HearingBasicInfoService(OnboardingAnswerRepository answerRepository, HearingAnswerEditService answerEditService,
+            Clock clock) {
         this.answerRepository = answerRepository;
+        this.answerEditService = answerEditService;
         this.clock = clock;
     }
 
@@ -149,7 +153,8 @@ public class HearingBasicInfoService {
                 return SaveResult.invalid(DATE_TOO_FAR);
             }
         }
-        OnboardingAnswer answer = found.get();
+        // プランの元になった回答は書き換えず、コピーした新しい行に入れる（HearingAnswerEditService）
+        OnboardingAnswer answer = answerEditService.findAnswerForEdit(userId).orElse(found.get());
         answer.setDesiredDate(desiredDate);
         answerRepository.save(answer);
         return SaveResult.saved();
@@ -183,7 +188,8 @@ public class HearingBasicInfoService {
             }
             budgetYen = manYen.intValue() * YEN_PER_MAN_YEN;
         }
-        OnboardingAnswer answer = found.get();
+        // プランの元になった回答は書き換えず、コピーした新しい行に入れる（HearingAnswerEditService）
+        OnboardingAnswer answer = answerEditService.findAnswerForEdit(userId).orElse(found.get());
         answer.setBudget(budgetYen);
         answerRepository.save(answer);
         return SaveResult.saved();

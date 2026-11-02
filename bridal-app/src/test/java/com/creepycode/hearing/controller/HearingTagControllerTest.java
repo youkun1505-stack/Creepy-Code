@@ -16,6 +16,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
@@ -38,6 +39,7 @@ import com.creepycode.auth.service.LoginUser;
 import com.creepycode.common.config.SecurityConfig;
 import com.creepycode.hearing.controller.HearingController.ProgressStep;
 import com.creepycode.hearing.dto.TagView;
+import com.creepycode.hearing.service.HearingAnswerEditService;
 import com.creepycode.hearing.service.HearingTag.Group;
 import com.creepycode.hearing.service.HearingTagService;
 
@@ -63,6 +65,10 @@ class HearingTagControllerTest {
     // SecurityConfig が使う（このテストではログインの確かめはしないので、偽物でよい）
     @MockitoBean
     private UserDetailsService userDetailsService;
+
+    // プランナーに送った後かの確かめ（ここでは送っていない＝false を返す偽物）
+    @MockitoBean
+    private HearingAnswerEditService answerEditService;
 
     @BeforeEach
     void setUp() {
@@ -163,6 +169,21 @@ class HearingTagControllerTest {
     void CSRFの値が無い送信は受け付けない() throws Exception {
         mockMvc.perform(post(PATH).with(user(CUSTOMER)).param("undecided", "u-venue"))
                 .andExpect(status().isForbidden());
+        verify(tagService, never()).saveTags(anyLong(), any(), any());
+    }
+
+    @Test
+    void プランナーに送った後は_STEP4を開いても保存しても_ハブへ戻して知らせを出す() throws Exception {
+        when(answerEditService.isLocked(1L)).thenReturn(true);
+
+        mockMvc.perform(get("/hearing/step4").with(user(CUSTOMER)))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/"))
+                .andExpect(flash().attribute("flashMessage", HearingAnswerEditService.LOCKED_MESSAGE));
+        mockMvc.perform(post("/hearing/step4").with(user(CUSTOMER)).with(csrf()).param("undecided", "u-venue"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/"))
+                .andExpect(flash().attribute("flashMessage", HearingAnswerEditService.LOCKED_MESSAGE));
         verify(tagService, never()).saveTags(anyLong(), any(), any());
     }
 }

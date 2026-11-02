@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.Sort;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.creepycode.hearing.dto.VisualQuestionView;
 import com.creepycode.hearing.dto.VisualSummaryView;
@@ -24,6 +26,9 @@ import com.creepycode.hearing.entity.OnboardingAnswer;
 import com.creepycode.hearing.entity.VisualImage;
 import com.creepycode.hearing.repository.OnboardingAnswerRepository;
 import com.creepycode.hearing.repository.VisualImageRepository;
+import com.creepycode.plan.entity.Plan;
+import com.creepycode.plan.entity.PlanStatus;
+import com.creepycode.plan.repository.PlanRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -34,6 +39,8 @@ class HearingVisualServiceTest {
     private static final Long USER_ID = 1L;
 
     private final OnboardingAnswerRepository answerRepository = mock(OnboardingAnswerRepository.class);
+    // プラン（PLANS）。既定では無し（回答はそのまま書き換える）
+    private final PlanRepository planRepository = mock(PlanRepository.class);
     private final VisualImageRepository visualImageRepository = mock(VisualImageRepository.class);
 
     // マスタの画像（IMAGE_ID の順）。テイストの順と IMAGE_ID の順はわざとずらしてある
@@ -57,7 +64,8 @@ class HearingVisualServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new HearingVisualService(answerRepository, visualImageRepository, new ObjectMapper());
+        service = new HearingVisualService(answerRepository, visualImageRepository, new ObjectMapper(),
+                new HearingAnswerEditService(answerRepository, planRepository));
         when(visualImageRepository.findAll(Sort.by("imageId"))).thenReturn(images);
         // findAllById は、渡された ID のうちマスタにあるものだけを返す（本物の動きに合わせる）
         when(visualImageRepository.findAllById(any())).thenAnswer(call -> {
@@ -202,6 +210,27 @@ class HearingVisualServiceTest {
         assertThat(stored).isSameAs(existing);
         assertThat(stored.getVisualSelections()).isEqualTo("[3,5,12]");
         assertThat(stored.getArchetypeId()).isEqualTo(3L);
+    }
+
+    @Test
+    void プランの元の回答なら_コピーした新しい行に保存し_元の行は変えない() {
+        OnboardingAnswer existing = answer(3L);
+        existing.setVisualSelections("[1]");
+        ReflectionTestUtils.setField(existing, "answerId", 10L);
+        when(answerRepository.findFirstByUserIdOrderByCreatedAtDesc(USER_ID)).thenReturn(Optional.of(existing));
+        Plan plan = new Plan();
+        plan.setAnswerId(10L);
+        plan.setStatus(PlanStatus.CUSTOMER_DRAFT_REVIEW);
+        when(planRepository.findFirstByUserIdOrderByCreatedAtDesc(USER_ID)).thenReturn(Optional.of(plan));
+        when(answerRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertThat(service.saveVisualSelections(USER_ID, List.of("5"))).isTrue();
+
+        assertThat(existing.getVisualSelections()).isEqualTo("[1]");
+        ArgumentCaptor<OnboardingAnswer> saved = ArgumentCaptor.forClass(OnboardingAnswer.class);
+        verify(answerRepository, times(2)).save(saved.capture());
+        assertThat(saved.getAllValues().get(1)).isNotSameAs(existing);
+        assertThat(saved.getAllValues().get(1).getVisualSelections()).isEqualTo("[5]");
     }
 
     @Test

@@ -9,8 +9,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.creepycode.auth.service.LoginUser;
+import com.creepycode.hearing.service.HearingAnswerEditService;
 import com.creepycode.hearing.service.HearingBasicInfoService;
 import com.creepycode.hearing.service.HearingBasicInfoService.SaveResult;
 
@@ -33,14 +35,21 @@ public class HearingBasicInfoController {
     private static final int CURRENT_STEP = 3;
 
     private final HearingBasicInfoService basicInfoService;
+    private final HearingAnswerEditService answerEditService;
 
-    public HearingBasicInfoController(HearingBasicInfoService basicInfoService) {
+    public HearingBasicInfoController(HearingBasicInfoService basicInfoService,
+            HearingAnswerEditService answerEditService) {
         this.basicInfoService = basicInfoService;
+        this.answerEditService = answerEditService;
     }
 
     /** 日程のページを表示する。STEP2 をまだ答えていなければ STEP2 へ戻す。保存した日付があれば入れた状態で出す。 */
     @GetMapping
-    public String showDate(@AuthenticationPrincipal LoginUser loginUser, Model model) {
+    public String showDate(@AuthenticationPrincipal LoginUser loginUser, Model model,
+            RedirectAttributes redirectAttributes) {
+        if (answerEditService.isLocked(loginUser.getUserId())) {
+            return HearingLock.redirectToHub(redirectAttributes);
+        }
         Long userId = loginUser.getUserId();
         if (!basicInfoService.hasAnsweredStep2(userId)) {
             return "redirect:" + URL_STEP2;
@@ -54,7 +63,11 @@ public class HearingBasicInfoController {
     @PostMapping
     public String saveDate(@AuthenticationPrincipal LoginUser loginUser,
             @RequestParam(name = "desiredDate", required = false) String desiredDate,
-            @RequestParam(name = "undecided", defaultValue = "false") boolean undecided, Model model) {
+            @RequestParam(name = "undecided", defaultValue = "false") boolean undecided, Model model,
+            RedirectAttributes redirectAttributes) {
+        if (answerEditService.isLocked(loginUser.getUserId())) {
+            return HearingLock.redirectToHub(redirectAttributes);
+        }
         SaveResult result = basicInfoService.saveDesiredDate(loginUser.getUserId(), desiredDate, undecided);
         return switch (result.status()) {
             case SAVED -> "redirect:" + URL_BUDGET;
@@ -68,7 +81,11 @@ public class HearingBasicInfoController {
 
     /** 予算のページを表示する。STEP2 をまだ答えていなければ STEP2 へ戻す。保存した金額があれば万円で入れた状態で出す。 */
     @GetMapping("/budget")
-    public String showBudget(@AuthenticationPrincipal LoginUser loginUser, Model model) {
+    public String showBudget(@AuthenticationPrincipal LoginUser loginUser, Model model,
+            RedirectAttributes redirectAttributes) {
+        if (answerEditService.isLocked(loginUser.getUserId())) {
+            return HearingLock.redirectToHub(redirectAttributes);
+        }
         Long userId = loginUser.getUserId();
         if (!basicInfoService.hasAnsweredStep2(userId)) {
             return "redirect:" + URL_STEP2;
@@ -82,7 +99,11 @@ public class HearingBasicInfoController {
     @PostMapping("/budget")
     public String saveBudget(@AuthenticationPrincipal LoginUser loginUser,
             @RequestParam(name = "budget", required = false) String budget,
-            @RequestParam(name = "undecided", defaultValue = "false") boolean undecided, Model model) {
+            @RequestParam(name = "undecided", defaultValue = "false") boolean undecided, Model model,
+            RedirectAttributes redirectAttributes) {
+        if (answerEditService.isLocked(loginUser.getUserId())) {
+            return HearingLock.redirectToHub(redirectAttributes);
+        }
         SaveResult result = basicInfoService.saveBudget(loginUser.getUserId(), budget, undecided);
         return switch (result.status()) {
             case SAVED -> "redirect:" + URL_STEP4;

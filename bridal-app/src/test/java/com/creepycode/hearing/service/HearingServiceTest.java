@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -16,12 +17,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.Sort;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.creepycode.hearing.dto.ArchetypeCardView;
 import com.creepycode.hearing.entity.ArchetypeMaster;
 import com.creepycode.hearing.entity.OnboardingAnswer;
 import com.creepycode.hearing.repository.ArchetypeMasterRepository;
 import com.creepycode.hearing.repository.OnboardingAnswerRepository;
+import com.creepycode.plan.entity.Plan;
+import com.creepycode.plan.entity.PlanStatus;
+import com.creepycode.plan.repository.PlanRepository;
 
 /**
  * かんたん質問（HearingService）のテスト。DB は使わず、Repository は偽物にする。
@@ -31,13 +36,16 @@ class HearingServiceTest {
     private static final Long USER_ID = 1L;
 
     private final OnboardingAnswerRepository answerRepository = mock(OnboardingAnswerRepository.class);
+    // プラン（PLANS）。既定では無し（回答はそのまま書き換える）
+    private final PlanRepository planRepository = mock(PlanRepository.class);
     private final ArchetypeMasterRepository archetypeRepository = mock(ArchetypeMasterRepository.class);
 
     private HearingService hearingService;
 
     @BeforeEach
     void setUp() {
-        hearingService = new HearingService(answerRepository, archetypeRepository);
+        hearingService = new HearingService(answerRepository, archetypeRepository,
+                new HearingAnswerEditService(answerRepository, planRepository));
         // 既定では、マスタに ID 1〜6 があり、顧客はまだ答えていない
         when(archetypeRepository.existsById(any())).thenAnswer(call -> {
             Long id = call.getArgument(0);
@@ -141,6 +149,45 @@ class HearingServiceTest {
     void マスタに無いIDや数字でない値は保存しない() {
         assertThat(hearingService.saveArchetypeChoice(USER_ID, "99")).isFalse();
         assertThat(hearingService.saveArchetypeChoice(USER_ID, "abc")).isFalse();
+        verify(answerRepository, never()).save(any());
+    }
+
+    @Test
+    void プランの元の回答なら_コピーした新しい行のアーキタイプを書き換え_元の行は変えない() {
+        OnboardingAnswer existing = answer(1L);
+        existing.setBudget(3000000);
+        ReflectionTestUtils.setField(existing, "answerId", 10L);
+        when(answerRepository.findFirstByUserIdOrderByCreatedAtDesc(USER_ID)).thenReturn(Optional.of(existing));
+        Plan plan = new Plan();
+        plan.setUserId(USER_ID);
+        plan.setAnswerId(10L);
+        plan.setStatus(PlanStatus.CUSTOMER_DRAFT_REVIEW);
+        when(planRepository.findFirstByUserIdOrderByCreatedAtDesc(USER_ID)).thenReturn(Optional.of(plan));
+        when(answerRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertThat(hearingService.saveArchetypeChoice(USER_ID, "5")).isTrue();
+
+        assertThat(existing.getArchetypeId()).isEqualTo(1L);
+        ArgumentCaptor<OnboardingAnswer> saved = ArgumentCaptor.forClass(OnboardingAnswer.class);
+        verify(answerRepository, times(2)).save(saved.capture());
+        OnboardingAnswer copy = saved.getAllValues().get(1);
+        assertThat(copy).isNotSameAs(existing);
+        assertThat(copy.getArchetypeId()).isEqualTo(5L);
+        assertThat(copy.getBudget()).isEqualTo(3000000);
+    }
+
+    @Test
+    void プランの元の回答でも_選択が無効ならコピーを作らない() {
+        OnboardingAnswer existing = answer(1L);
+        ReflectionTestUtils.setField(existing, "answerId", 10L);
+        when(answerRepository.findFirstByUserIdOrderByCreatedAtDesc(USER_ID)).thenReturn(Optional.of(existing));
+        Plan plan = new Plan();
+        plan.setAnswerId(10L);
+        plan.setStatus(PlanStatus.CUSTOMER_DRAFT_REVIEW);
+        when(planRepository.findFirstByUserIdOrderByCreatedAtDesc(USER_ID)).thenReturn(Optional.of(plan));
+
+        assertThat(hearingService.saveArchetypeChoice(USER_ID, "99")).isFalse();
+
         verify(answerRepository, never()).save(any());
     }
 
