@@ -2,7 +2,10 @@ package com.creepycode.auth.controller;
 
 import java.util.Optional;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -11,7 +14,9 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
+import com.creepycode.auth.dto.DemoLoginForm;
 import com.creepycode.auth.dto.LoginForm;
+import com.creepycode.auth.entity.UserRole;
 import com.creepycode.auth.service.LoginService;
 import com.creepycode.auth.service.LoginUser;
 
@@ -35,9 +40,14 @@ public class LoginController {
     private static final String FAILED_MESSAGE = "メールアドレスまたはパスワードが正しくありません";
 
     private final LoginService loginService;
+    private final UserDetailsService userDetailsService;
+    private final boolean demoLoginEnabled;
 
-    public LoginController(LoginService loginService) {
+    public LoginController(LoginService loginService, UserDetailsService userDetailsService,
+            @Value("${app.demo-login.enabled:false}") boolean demoLoginEnabled) {
         this.loginService = loginService;
+        this.userDetailsService = userDetailsService;
+        this.demoLoginEnabled = demoLoginEnabled;
     }
 
     /** ログイン画面を表示する。すでにログインしているときは、種別ごとの画面へ進める。 */
@@ -49,6 +59,45 @@ public class LoginController {
         model.addAttribute("loginForm", new LoginForm());
         addLinks(model);
         return VIEW;
+    }
+
+    /** 設定で有効な場合だけ、既存のテスト用顧客としてデモログインする。 */
+    @PostMapping("/demo")
+    public String demoLogin(@AuthenticationPrincipal LoginUser currentUser,
+            @Valid @ModelAttribute DemoLoginForm demoLoginForm, BindingResult bindingResult,
+            Model model, HttpServletRequest request, HttpServletResponse response) {
+        if (currentUser != null) {
+            return "redirect:" + loginService.homeUrl(currentUser.getRole());
+        }
+        if (!demoLoginEnabled) {
+            return "redirect:/auth/login";
+        }
+        if (bindingResult.hasErrors()) {
+            model.addAttribute("loginForm", new LoginForm());
+            addLinks(model);
+            return VIEW;
+        }
+
+        LoginUser demoUser;
+        try {
+            demoUser = (LoginUser) userDetailsService.loadUserByUsername("customer@example.com");
+        } catch (UsernameNotFoundException e) {
+            bindingResult.reject("failed", FAILED_MESSAGE);
+            model.addAttribute("loginForm", new LoginForm());
+            addLinks(model);
+            return VIEW;
+        }
+        if (demoUser.getRole() != UserRole.CUSTOMER || !demoUser.isEnabled()
+                || !demoUser.isAccountNonLocked() || !demoUser.isAccountNonExpired()) {
+            bindingResult.reject("failed", FAILED_MESSAGE);
+            model.addAttribute("loginForm", new LoginForm());
+            addLinks(model);
+            return VIEW;
+        }
+
+        LoginUser namedDemoUser = demoUser.withName(demoLoginForm.getName().strip());
+        loginService.startSession(namedDemoUser, request, response);
+        return "redirect:/";
     }
 
     /** メールアドレスとパスワードを確かめ、ログインして種別に合わせた画面へ進める。合わないときは、同じ画面にエラーを出す。 */
@@ -85,5 +134,9 @@ public class LoginController {
     private void addLinks(Model model) {
         model.addAttribute("registerUrl", URL_REGISTER);
         model.addAttribute("passwordResetUrl", URL_PASSWORD_RESET);
+        model.addAttribute("demoLoginEnabled", demoLoginEnabled);
+        if (demoLoginEnabled && !model.containsAttribute("demoLoginForm")) {
+            model.addAttribute("demoLoginForm", new DemoLoginForm());
+        }
     }
 }

@@ -7,6 +7,7 @@ import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -26,6 +27,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.validation.BindingResult;
@@ -38,7 +40,7 @@ import com.creepycode.common.config.SecurityConfig;
 /**
  * ログイン画面（P-03）の Controller のテスト。DB は使わず、LoginService は偽物にする。
  */
-@WebMvcTest(LoginController.class)
+@WebMvcTest(value = LoginController.class, properties = "app.demo-login.enabled=true")
 @Import(SecurityConfig.class)
 class LoginControllerTest {
 
@@ -129,5 +131,71 @@ class LoginControllerTest {
                 .andExpect(model().attributeHasFieldErrors("loginForm", "email", "password"));
 
         verify(loginService, never()).authenticate(anyString(), anyString());
+    }
+
+    @Test
+    void 有効時は初期名を表示し_CSRF付きPOSTで入力名の顧客としてログインする() throws Exception {
+        LoginUser customer = new LoginUser(1L, "customer@example.com", "hash", "テスト 顧客", UserRole.CUSTOMER);
+        when(userDetailsService.loadUserByUsername("customer@example.com")).thenReturn(customer);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/auth/login"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("demoLoginEnabled", true))
+                .andExpect(model().attribute("demoLoginForm", hasProperty("name", is("田中太郎"))));
+
+        mockMvc.perform(post("/auth/login/demo").with(csrf()).param("name", "山田花子"))
+                .andExpect(redirectedUrl("/"));
+
+        org.mockito.ArgumentCaptor<LoginUser> principal = org.mockito.ArgumentCaptor.forClass(LoginUser.class);
+        verify(loginService).startSession(principal.capture(), any(), any());
+        assertEquals("山田花子", principal.getValue().getName());
+        assertEquals("customer@example.com", principal.getValue().getUsername());
+        assertEquals(UserRole.CUSTOMER, principal.getValue().getRole());
+    }
+
+    @Test
+    void デモログインは_CSRFがないPOSTを拒否する() throws Exception {
+        mockMvc.perform(post("/auth/login/demo").param("name", "田中太郎"))
+                .andExpect(status().isForbidden());
+
+        verify(userDetailsService, never()).loadUserByUsername(anyString());
+        verify(loginService, never()).startSession(any(), any(), any());
+    }
+
+    @Test
+    void デモログインは_空欄と101文字の名前を拒否する() throws Exception {
+        mockMvc.perform(post("/auth/login/demo").with(csrf()).param("name", " "))
+                .andExpect(status().isOk())
+                .andExpect(model().attributeHasFieldErrors("demoLoginForm", "name"));
+        mockMvc.perform(post("/auth/login/demo").with(csrf()).param("name", "あ".repeat(101)))
+                .andExpect(status().isOk())
+                .andExpect(model().attributeHasFieldErrors("demoLoginForm", "name"));
+
+        verify(userDetailsService, never()).loadUserByUsername(anyString());
+        verify(loginService, never()).startSession(any(), any(), any());
+    }
+
+    @Test
+    void テスト用利用者が存在しない場合はログインさせない() throws Exception {
+        doThrow(new UsernameNotFoundException("missing"))
+                .when(userDetailsService).loadUserByUsername("customer@example.com");
+
+        mockMvc.perform(post("/auth/login/demo").with(csrf()).param("name", "田中太郎"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("auth/login"));
+
+        verify(loginService, never()).startSession(any(), any(), any());
+    }
+
+    @Test
+    void テスト用利用者がCUSTOMERでない場合はログインさせない() throws Exception {
+        when(userDetailsService.loadUserByUsername("customer@example.com")).thenReturn(
+                new LoginUser(2L, "customer@example.com", "hash", "別ロール", UserRole.PLANNER));
+
+        mockMvc.perform(post("/auth/login/demo").with(csrf()).param("name", "田中太郎"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("auth/login"));
+
+        verify(loginService, never()).startSession(any(), any(), any());
     }
 }

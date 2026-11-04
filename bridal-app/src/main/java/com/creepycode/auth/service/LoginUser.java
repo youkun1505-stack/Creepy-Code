@@ -49,6 +49,11 @@ public class LoginUser implements UserDetails, CredentialsContainer {
         return name;
     }
 
+    /** USERS の名前を変えず、セッション表示名だけを置き換えた利用者を作る。 */
+    public LoginUser withName(String displayName) {
+        return new LoginUser(userId, email, passwordHash, displayName, role);
+    }
+
     /** 利用者の種別を返す。 */
     public UserRole getRole() {
         return role;
