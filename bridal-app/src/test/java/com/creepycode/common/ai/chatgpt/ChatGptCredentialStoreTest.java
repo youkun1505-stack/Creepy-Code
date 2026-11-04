@@ -7,8 +7,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
@@ -137,6 +140,83 @@ class ChatGptCredentialStoreTest {
         try (Stream<Path> files = Files.list(directory)) {
             return files.toList();
         }
+    }
+
+    @Test
+    void earliest_refresh_atを保存して読めて_無い資格情報は空になる() {
+        Path directory = tempDir.resolve("chatgpt-java");
+        ChatGptCredentialStore store = new ChatGptCredentialStore(directory, new FakeProtector(false));
+        ChatGptCredentials withEarliest = new ChatGptCredentials("A-1", "R-1", null,
+                Instant.parse("2026-10-27T13:00:00Z"), "openid", Instant.parse("2026-10-27T12:30:00Z"));
+
+        store.save(withEarliest);
+
+        assertThat(store.load()).isEqualTo(Optional.of(withEarliest));
+        store.save(CREDENTIALS);
+        assertThat(store.load().orElseThrow().earliestRefreshAt()).isNull();
+    }
+
+    @Test
+    void 更新の項目が無い古い形のファイルも読める() throws IOException {
+        Path directory = tempDir.resolve("chatgpt-java");
+        Files.createDirectories(directory);
+        // 今までの保存の形（earliestRefreshAt の項目が無い）を、同じ暗号化で書く
+        String oldJson = "{\"accessToken\":\"OLD-ACCESS\",\"refreshToken\":\"OLD-REFRESH\",\"idToken\":null,"
+                + "\"expiresAt\":\"2026-10-27T12:00:00Z\",\"scope\":\"openid\"}";
+        byte[] encrypted = new FakeProtector(false).protect(oldJson.getBytes(StandardCharsets.UTF_8));
+        Files.writeString(directory.resolve("credentials.dat"),
+                Base64.getEncoder().encodeToString(encrypted), StandardCharsets.US_ASCII);
+        ChatGptCredentialStore store = new ChatGptCredentialStore(directory, new FakeProtector(false));
+
+        assertThat(store.load()).isEqualTo(Optional.of(new ChatGptCredentials("OLD-ACCESS", "OLD-REFRESH", null,
+                Instant.parse("2026-10-27T12:00:00Z"), "openid")));
+    }
+
+    @Test
+    void 更新時刻は保存すると得られ_消すと空になる() {
+        Path directory = tempDir.resolve("chatgpt-java");
+        ChatGptCredentialStore store = new ChatGptCredentialStore(directory, new FakeProtector(false));
+        assertThat(store.credentialsModifiedAt()).isEmpty();
+
+        store.save(CREDENTIALS);
+        assertThat(store.credentialsModifiedAt()).isPresent();
+
+        store.clear();
+        assertThat(store.credentialsModifiedAt()).isEmpty();
+    }
+
+    @Test
+    void 読むスレッドと同時に保存しても_保存は失敗せず_最後に保存した内容が読める() throws Exception {
+        Path directory = tempDir.resolve("chatgpt-java");
+        ChatGptCredentialStore store = new ChatGptCredentialStore(directory, new FakeProtector(false));
+        store.save(CREDENTIALS);
+        AtomicBoolean stop = new AtomicBoolean();
+        Thread reader = new Thread(() -> {
+            // 保存の合間もずっと読み続ける（Windows では、読んでいるファイルは置き換えられないため）
+            while (!stop.get()) {
+                store.load();
+            }
+        });
+        reader.start();
+        List<Exception> failures = new ArrayList<>();
+        ChatGptCredentials last = null;
+        try {
+            for (int i = 0; i < 200; i++) {
+                last = new ChatGptCredentials("ACCESS-" + i, "REFRESH-" + i, null,
+                        Instant.parse("2026-10-27T13:00:00Z"), "openid");
+                try {
+                    store.save(last);
+                } catch (RuntimeException e) {
+                    failures.add(e);
+                }
+            }
+        } finally {
+            stop.set(true);
+            reader.join();
+        }
+
+        assertThat(failures).isEmpty();
+        assertThat(store.load()).isEqualTo(Optional.of(last));
     }
 
     /** テスト用の偽の暗号化。平文をそのまま見えないように XOR する（DPAPI の代わり）。 */

@@ -7,7 +7,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.http.HttpClient;
 import java.nio.file.Path;
+import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -16,6 +18,7 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,6 +47,9 @@ import com.sun.net.httpserver.HttpServer;
 class ChatGptAiClientTest {
 
     private static final String PATH = "/v1/responses";
+    private static final String TOKEN_PATH = "/oauth/token";
+    private static final String NEW_TOKEN_JSON = "{\"access_token\":\"NEW-ACCESS-TOKEN\",\"refresh_token\":\"NEW-REFRESH\","
+            + "\"expires_in\":3600,\"scope\":\"openid chatgpt.tokens.use.direct\"}";
     private static final String TOKEN = "ACCESS-TOKEN-SECRET-123";
     private static final String REFRESH = "REFRESH-TOKEN-SECRET-456";
     private static final String INSTRUCTIONS = "INSTRUCTIONS-SECRET-789";
@@ -69,6 +75,9 @@ class ChatGptAiClientTest {
     private ChatGptCredentialStore store;
     private final List<Captured> requests = new CopyOnWriteArrayList<>();
     private volatile Responder responder;
+    /** トークン更新の偽の応答（同じ偽サーバーの別の道筋）。受け取った本文を tokenBodies に残す。 */
+    private final List<String> tokenBodies = new CopyOnWriteArrayList<>();
+    private volatile Responder tokenResponder;
     private volatile CountDownLatch release;
     private ListAppender<ILoggingEvent> logs;
     private Logger logger;
@@ -77,11 +86,16 @@ class ChatGptAiClientTest {
     void startFakeServer() throws IOException {
         store = new ChatGptCredentialStore(tempDir.resolve("chatgpt-java"), new IdentityProtector());
         release = new CountDownLatch(1);
+        tokenResponder = exchange -> sendJson(exchange, 500, "{\"error\":\"unexpected\"}");
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext(PATH, exchange -> {
             String body = new String(exchange.getRequestBody().readAllBytes(), UTF_8);
             requests.add(new Captured(exchange.getRequestHeaders().getFirst("Authorization"), body));
             responder.respond(exchange);
+        });
+        server.createContext(TOKEN_PATH, exchange -> {
+            tokenBodies.add(new String(exchange.getRequestBody().readAllBytes(), UTF_8));
+            tokenResponder.respond(exchange);
         });
         server.start();
         // ログは ListAppender で捕まえて、中身を確かめる
@@ -320,10 +334,97 @@ class ChatGptAiClientTest {
                 });
     }
 
+    @Test
+    void AIが401を返したら_トークンを1回だけ更新してやり直す() throws IOException {
+        signIn(EXPIRES_LATER);
+        store.saveRegistration(new ChatGptRegistration("urn:uuid:test-host", "client-test"));
+        AtomicInteger calls = new AtomicInteger();
+        responder = exchange -> {
+            if (calls.getAndIncrement() == 0) {
+                sseError(exchange, 401, "{\"detail\":\"Not authenticated\"}");
+            } else {
+                sseOk(exchange, sse(delta("更新後"), completed()));
+            }
+        };
+        tokenResponder = exchange -> sendJson(exchange, 200, NEW_TOKEN_JSON);
+
+        String reply = refreshingClient(Duration.ofSeconds(30)).generate(INSTRUCTIONS, INPUT);
+
+        assertThat(reply).isEqualTo("更新後");
+        assertThat(requests).hasSize(2);
+        assertThat(requests.get(0).authorization()).isEqualTo("Bearer " + TOKEN);
+        assertThat(requests.get(1).authorization()).isEqualTo("Bearer NEW-ACCESS-TOKEN");
+        assertThat(tokenBodies).hasSize(1);
+        assertThat(store.load().orElseThrow().accessToken()).isEqualTo("NEW-ACCESS-TOKEN");
+    }
+
+    @Test
+    void 更新してやり直しても_2回目の401なら_401の文言の例外にし_更新は1回だけ() throws IOException {
+        signIn(EXPIRES_LATER);
+        store.saveRegistration(new ChatGptRegistration("urn:uuid:test-host", "client-test"));
+        responder = exchange -> sseError(exchange, 401, "{\"detail\":\"Not authenticated\"}");
+        tokenResponder = exchange -> sendJson(exchange, 200, NEW_TOKEN_JSON);
+
+        assertThatThrownBy(() -> refreshingClient(Duration.ofSeconds(30)).generate(INSTRUCTIONS, INPUT))
+                .isInstanceOf(AiException.class)
+                .hasMessageContaining("サインインし直して")
+                .hasMessageNotContaining("NEW-ACCESS-TOKEN");
+        assertThat(requests).hasSize(2);
+        assertThat(tokenBodies).hasSize(1);
+    }
+
+    @Test
+    void 更新を含めても_全体の制限時間で時間切れの例外になり_トークンは出ない() throws IOException {
+        signIn(EXPIRED);
+        store.saveRegistration(new ChatGptRegistration("urn:uuid:test-host", "client-test"));
+        // 期限が切れているので更新が要る。更新の応答を止めて、全体の制限時間を超えさせる
+        tokenResponder = exchange -> {
+            awaitRelease();
+            sendJson(exchange, 200, NEW_TOKEN_JSON);
+        };
+        ChatGptAiClient client = refreshingClient(Duration.ofMillis(500));
+
+        long start = System.nanoTime();
+        assertThatThrownBy(() -> client.generate(INSTRUCTIONS, INPUT))
+                .isInstanceOf(AiException.class)
+                .hasMessageContaining("制限時間内に終わりませんでした")
+                .hasMessageNotContaining(TOKEN)
+                .hasMessageNotContaining(REFRESH);
+        assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(5));
+        assertThat(requests).isEmpty();
+    }
+
+    /** 更新の接続先も偽サーバーに向けたクライアントを作る（401 のやり直しと期限切れの更新の確認用）。 */
+    private ChatGptAiClient refreshingClient(Duration timeout) {
+        String responsesUrl = "http://127.0.0.1:" + server.getAddress().getPort() + PATH;
+        String tokenUrl = "http://127.0.0.1:" + server.getAddress().getPort() + TOKEN_PATH;
+        ChatGptOAuthClient oauth = new ChatGptOAuthClient(
+                new ChatGptEndpoints(ChatGptEndpoints.OFFICIAL_AUTHORIZE_URL, tokenUrl),
+                HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build(), CLOCK, new SecureRandom());
+        return new ChatGptAiClient(new ChatGptTokenProvider(store, oauth, CLOCK), responsesUrl, "gpt-test", timeout);
+    }
+
     /** 偽サーバーの Responses API に向けたクライアントを作る。 */
     private ChatGptAiClient client(Duration timeout) {
         String url = "http://127.0.0.1:" + server.getAddress().getPort() + PATH;
         return new ChatGptAiClient(store, url, "gpt-test", timeout, CLOCK);
+    }
+
+    private void awaitRelease() {
+        try {
+            release.await(20, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private static void sendJson(HttpExchange exchange, int status, String body) throws IOException {
+        byte[] bytes = body.getBytes(UTF_8);
+        exchange.getResponseHeaders().add("Content-Type", "application/json");
+        exchange.sendResponseHeaders(status, bytes.length);
+        try (OutputStream out = exchange.getResponseBody()) {
+            out.write(bytes);
+        }
     }
 
     private void signIn(Instant expiresAt) {

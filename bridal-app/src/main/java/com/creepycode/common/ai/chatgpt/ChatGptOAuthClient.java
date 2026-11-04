@@ -10,11 +10,20 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.Clock;
+import java.time.DateTimeException;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,13 +54,26 @@ public class ChatGptOAuthClient {
     /** トークン交換の失敗の種類。この値のときだけ、発行 ID で認可をやり直せる。 */
     static final String ERROR_INVALID_GRANT = "invalid_grant";
 
+    /** 公式の失敗の種類 invalid_client（アプリの登録の設定の誤り）。資格情報は消さない。 */
+    static final String INVALID_CLIENT = "invalid_client";
+    /** 公式が挙げた、資格情報を消してよい6つの失敗の種類（errors-and-recovery）。 */
+    static final Set<String> REJECTED_REFRESH_ERRORS = Set.of("invalid_grant", "invalid_refresh_token",
+            "token_expired", "refresh_token_expired", "refresh_token_invalidated", "refresh_token_reused");
+    /** ログに出してよい失敗の種類の名前（上の6つと invalid_client）。これ以外の値は出さない。 */
+    private static final Set<String> KNOWN_REFRESH_ERRORS = Set.of("invalid_grant", "invalid_refresh_token",
+            "token_expired", "refresh_token_expired", "refresh_token_invalidated", "refresh_token_reused",
+            INVALID_CLIENT);
+
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration EXCHANGE_TIMEOUT = Duration.ofSeconds(30);
+    /** トークン更新の通信の制限時間（呼び出し側の全体の制限時間より短くする）。 */
+    static final Duration REFRESH_TIMEOUT = Duration.ofSeconds(20);
 
     private final ChatGptEndpoints endpoints;
     private final HttpClient httpClient;
     private final Clock clock;
     private final SecureRandom random;
+    private final Duration refreshTimeout;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /** 公式の仕組み（既定の HttpClient・現在時刻・安全な乱数）で作る。 */
@@ -67,10 +89,19 @@ public class ChatGptOAuthClient {
      * @param random     verifier・state・nonce に使う乱数（本物は SecureRandom）
      */
     public ChatGptOAuthClient(ChatGptEndpoints endpoints, HttpClient httpClient, Clock clock, SecureRandom random) {
+        this(endpoints, httpClient, clock, random, REFRESH_TIMEOUT);
+    }
+
+    /**
+     * @param refreshTimeout 更新の通信全体（本文を含む）の制限時間（テストでは短くする）
+     */
+    ChatGptOAuthClient(ChatGptEndpoints endpoints, HttpClient httpClient, Clock clock, SecureRandom random,
+            Duration refreshTimeout) {
         this.endpoints = endpoints;
         this.httpClient = httpClient;
         this.clock = clock;
         this.random = random;
+        this.refreshTimeout = refreshTimeout;
     }
 
     /**
@@ -234,12 +265,213 @@ public class ChatGptOAuthClient {
                     "プランの利用が許可されていません。Plus・Pro のプランか、ChatGPT の設定を確かめてください。");
         }
         return new ChatGptCredentials(accessToken, refreshToken, idToken,
-                clock.instant().plusSeconds(expiresIn.asLong()), scope);
+                clock.instant().plusSeconds(expiresIn.asLong()), scope,
+                parseEarliest(json.get("earliest_refresh_at")));
+    }
+
+    /**
+     * アクセストークンを更新する（form 形式の POST。送る項目は grant_type・client_id・refresh_token・resource の4つだけ。scope は送らない）。
+     * 応答の新しい更新用トークンは、呼び出し側が保存してから使う（この部品は保存しない）。
+     * 応答に id_token・scope が無いときは前の値を残す。scope があってプランの scope が無いときは例外にする。
+     * 応答の本文はログにも例外にも出さない。ログに出すのは、公式の失敗の種類の名前（既知のものだけ）と HTTP の番号。
+     *
+     * @param registration 登録情報（発行された client_id を使う）
+     * @param current      今の資格情報（更新用トークンと、前の id_token・scope を使う）
+     * @throws RefreshException 更新できなかったとき（種類で、資格情報を消すかどうかが決まる）
+     */
+    public ChatGptCredentials refresh(ChatGptRegistration registration, ChatGptCredentials current) {
+        Map<String, String> form = new LinkedHashMap<>();
+        form.put("grant_type", "refresh_token");
+        form.put("client_id", registration.clientId());
+        form.put("refresh_token", current.refreshToken());
+        form.put("resource", RESOURCE);
+
+        HttpRequest request = HttpRequest.newBuilder(URI.create(endpoints.tokenUrl()))
+                .timeout(refreshTimeout)
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .header("Accept", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(formEncode(form), StandardCharsets.UTF_8))
+                .build();
+        HttpResponse<String> response = sendRefresh(request);
+        if (response.statusCode() != 200) {
+            String error = knownRefreshError(response.body());
+            log.warn("ChatGPT のトークン更新が失敗しました（HTTP {}・種類：{}）", response.statusCode(),
+                    error == null ? "不明" : error);
+            if (error != null && REJECTED_REFRESH_ERRORS.contains(error)) {
+                throw new RefreshException(RefreshException.Kind.REJECTED,
+                        "サインインの情報が使えなくなりました。サインインし直してください。");
+            }
+            if (INVALID_CLIENT.equals(error)) {
+                throw new RefreshException(RefreshException.Kind.INVALID_CLIENT,
+                        "アプリの登録の設定が合わないため、サインインを更新できませんでした。");
+            }
+            throw new RefreshException(RefreshException.Kind.FAILED,
+                    "サインインを更新できませんでした（HTTP " + response.statusCode() + "）。");
+        }
+        return toRefreshed(response.body(), current);
+    }
+
+    /**
+     * 更新の通信を、本文を含めて制限時間の中で行う。HttpRequest.timeout は本文の途中の停止には効かないため、
+     * 送信は非同期にして、制限時間を過ぎたら通信を打ち切る（呼び出し側のスレッドを戻すため）。
+     */
+    private HttpResponse<String> sendRefresh(HttpRequest request) {
+        CompletableFuture<HttpResponse<String>> pending = httpClient.sendAsync(request,
+                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        try {
+            return pending.get(refreshTimeout.toNanos(), TimeUnit.NANOSECONDS);
+        } catch (TimeoutException e) {
+            pending.cancel(true);
+            throw new RefreshException(RefreshException.Kind.FAILED,
+                    "トークンの更新が制限時間内に終わりませんでした。時間をおいてから、もう一度お試しください。");
+        } catch (ExecutionException e) {
+            // 通信の失敗は資格情報を消さない（一時的な失敗かもしれないため）
+            throw new RefreshException(RefreshException.Kind.FAILED,
+                    "トークンの更新で通信に失敗しました。時間をおいてから、もう一度お試しください。");
+        } catch (InterruptedException e) {
+            pending.cancel(true);
+            Thread.currentThread().interrupt();
+            throw new RefreshException(RefreshException.Kind.FAILED, "トークンの更新が中断されました。");
+        }
+    }
+
+    /**
+     * 更新の成功の応答（JSON）から資格情報を作る。前の値を残す項目（id_token・scope）はここで決める。
+     * 応答に新しい refresh_token があれば、検査に失敗しても、使える項目で作った資格情報を RefreshException に入れて返す。
+     * 公式は、更新用トークンは使うと替わると定めており（古いものはもう使えない）、新しいものを失うとサインインし直しになるため。
+     */
+    private ChatGptCredentials toRefreshed(String body, ChatGptCredentials current) {
+        JsonNode json;
+        try {
+            json = objectMapper.readTree(body);
+        } catch (IOException e) {
+            throw new RefreshException(RefreshException.Kind.FAILED, "トークンの更新の応答を読めませんでした。");
+        }
+        if (json == null || !json.isObject()) {
+            throw new RefreshException(RefreshException.Kind.FAILED, "トークンの更新の応答の形が想定と違います。");
+        }
+        String accessToken = textOf(json, "access_token");
+        String refreshToken = textOf(json, "refresh_token");
+        JsonNode expiresIn = json.get("expires_in");
+        boolean usableExpiry = expiresIn != null && expiresIn.isIntegralNumber() && expiresIn.asLong() > 0;
+        // 応答に ID トークンが無いときは前の値を残す。nonce の確認はできないので、ここでは確かめない
+        String idToken = textOf(json, "id_token");
+        if (idToken == null) {
+            idToken = current.idToken();
+        }
+        String responseScope = textOf(json, "scope");
+        String scope = responseScope == null ? current.scope() : responseScope;
+
+        if (accessToken == null || refreshToken == null || !usableExpiry) {
+            // 新しい更新用トークンだけは、使える項目（今のアクセストークン・期限）と一緒に保存する
+            ChatGptCredentials salvage = refreshToken == null ? null : new ChatGptCredentials(current.accessToken(),
+                    refreshToken, current.idToken(), current.expiresAt(), current.scope(),
+                    current.earliestRefreshAt());
+            throw new RefreshException(RefreshException.Kind.FAILED, "トークンの更新の応答の形が想定と違います。",
+                    salvage);
+        }
+        ChatGptCredentials refreshed = new ChatGptCredentials(accessToken, refreshToken, idToken,
+                clock.instant().plusSeconds(expiresIn.asLong()), scope,
+                parseEarliest(json.get("earliest_refresh_at")));
+        if (responseScope != null && !List.of(responseScope.trim().split("\\s+")).contains(PLAN_SCOPE)) {
+            // プランの許可が無い（公式は、サインインは保ったままプランの利用を無効として扱うと定めている）。新しい資格情報は保存させる
+            throw new RefreshException(RefreshException.Kind.FAILED,
+                    "プランの利用が許可されていません。Plus・Pro のプランか、ChatGPT の設定を確かめてください。", refreshed);
+        }
+        return refreshed;
+    }
+
+    /** 失敗の応答から、既知の失敗の種類の名前だけを返す。error が文字の形と error.code の形の両方を読む。知らない値・読めないときは null。 */
+    private String knownRefreshError(String body) {
+        try {
+            JsonNode json = objectMapper.readTree(body);
+            if (json == null || !json.isObject()) {
+                return null;
+            }
+            JsonNode error = json.get("error");
+            String name = null;
+            if (error != null && error.isTextual()) {
+                name = error.asText();
+            } else if (error != null && error.isObject()) {
+                name = textOf(error, "code");
+            }
+            return name != null && KNOWN_REFRESH_ERRORS.contains(name) ? name : null;
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    /**
+     * earliest_refresh_at を読む。形は公式に説明がないので、数値（秒。1970年からの秒として読む）と ISO の文字の両方を読む。
+     * 読めなければ null（無いものとして扱う）。
+     */
+    static Instant parseEarliest(JsonNode node) {
+        if (node == null || node.isNull() || node.isMissingNode()) {
+            return null;
+        }
+        try {
+            if (node.isNumber()) {
+                return Instant.ofEpochSecond(node.asLong());
+            }
+            if (node.isTextual()) {
+                String text = node.asText().trim();
+                try {
+                    return Instant.parse(text);
+                } catch (DateTimeParseException e) {
+                    return OffsetDateTime.parse(text).toInstant();
+                }
+            }
+            return null;
+        } catch (DateTimeException e) {
+            return null;
+        }
     }
 
     private static String textOf(JsonNode json, String name) {
         JsonNode node = json.get(name);
         return (node != null && node.isTextual() && !node.asText().isBlank()) ? node.asText() : null;
+    }
+
+    /**
+     * トークンの更新が失敗したときの例外。種類で、資格情報を消すかどうかが決まる。
+     * 公式の失敗の種類（REJECTED）のときだけ、呼び出し側が資格情報を消す。通信・503・invalid_client では消さない。
+     */
+    public static class RefreshException extends RuntimeException {
+
+        /** 失敗の種類。 */
+        public enum Kind {
+            /** 更新用トークンが使えなくなった（資格情報を消して、サインインし直してもらう） */
+            REJECTED,
+            /** アプリの登録の設定の誤り（資格情報は消さない） */
+            INVALID_CLIENT,
+            /** 一時的な失敗・応答の形の誤りなど（資格情報は消さない） */
+            FAILED
+        }
+
+        private final Kind kind;
+        private final ChatGptCredentials salvage;
+
+        public RefreshException(Kind kind, String message) {
+            this(kind, message, null);
+        }
+
+        /**
+         * @param salvage 検査に失敗した応答から作った、保存すべき新しい資格情報（無ければ null）
+         */
+        RefreshException(Kind kind, String message, ChatGptCredentials salvage) {
+            super(message);
+            this.kind = kind;
+            this.salvage = salvage;
+        }
+
+        public Kind kind() {
+            return kind;
+        }
+
+        /** 保存すべき新しい資格情報（新しい更新用トークンを含む）。無ければ null。 */
+        ChatGptCredentials salvage() {
+            return salvage;
+        }
     }
 
     /** 項目を form 形式（key=value を & でつなぐ。値は URL エンコード）にする。 */

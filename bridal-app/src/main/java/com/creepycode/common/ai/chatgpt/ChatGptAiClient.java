@@ -64,11 +64,10 @@ public class ChatGptAiClient implements AiClient {
     /** ログに出す項目1つの長さの上限（文字）。 */
     private static final int MAX_FIELD_CHARS = 100;
 
-    private final ChatGptCredentialStore store;
+    private final ChatGptTokenProvider tokens;
     private final URI responsesUri;
     private final String model;
     private final Duration timeout;
-    private final Clock clock;
     private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -79,6 +78,8 @@ public class ChatGptAiClient implements AiClient {
     }
 
     /**
+     * 保存先から資格情報を読み、公式の接続先で更新するクライアントを作る（テストの組み立て）。
+     *
      * @param store        サインイン情報の保存先（トークンの読み込みに使う）
      * @param responsesUrl Responses API の URL（テストでは 127.0.0.1 の偽サーバー）
      * @param model        使うモデル名（app.ai.model）
@@ -86,11 +87,21 @@ public class ChatGptAiClient implements AiClient {
      * @param clock        期限の確認に使う時刻（テストでは固定の時刻）
      */
     ChatGptAiClient(ChatGptCredentialStore store, String responsesUrl, String model, Duration timeout, Clock clock) {
-        this.store = store;
+        this(new ChatGptTokenProvider(store, new ChatGptOAuthClient(ChatGptEndpoints.official()), clock),
+                responsesUrl, model, timeout);
+    }
+
+    /**
+     * @param tokens       使うトークン（読み込みと更新。テストでは更新の接続先を偽サーバーにした部品）
+     * @param responsesUrl Responses API の URL（テストでは 127.0.0.1 の偽サーバー）
+     * @param model        使うモデル名（app.ai.model）
+     * @param timeout      更新とやり直しを含めた、返事全体の制限時間
+     */
+    ChatGptAiClient(ChatGptTokenProvider tokens, String responsesUrl, String model, Duration timeout) {
+        this.tokens = tokens;
         this.responsesUri = URI.create(responsesUrl);
         this.model = model;
         this.timeout = timeout;
-        this.clock = clock;
     }
 
     /**
@@ -114,18 +125,43 @@ public class ChatGptAiClient implements AiClient {
     }
 
     /**
-     * Responses API を呼び、返事の文章を返す。通信を始める前にサインイン情報を確かめ、
-     * 無い・期限切れのときは通信せずに例外にする。返事全体の制限時間を過ぎたら時間切れの例外にする。
+     * Responses API を呼び、返事の文章を返す。返事全体（トークンの更新・やり直しを含む）の制限時間を過ぎたら時間切れの例外にする。
+     * トークンは ChatGptTokenProvider で確かめ、期限が近ければ更新する。サインインしていない・更新できないときは通信せずに例外にする。
+     * AI が 401 を返したときは、トークンを1回だけ更新してやり直す。2回目の 401 は、そのまま 401 の文言の例外にする。
      */
     @Override
     public String generate(String instructions, String input) {
-        ChatGptCredentials credentials = usableCredentials();
+        long deadline = System.nanoTime() + timeout.toNanos();
+        String body = requestBody(instructions, input);
+        ChatGptCredentials credentials = tokens.usable(remaining(deadline));
+        try {
+            return send(credentials, body, deadline);
+        } catch (UnauthorizedException e) {
+            ChatGptCredentials renewed = tokens.afterUnauthorized(credentials.accessToken(), remaining(deadline));
+            return send(renewed, body, deadline);
+        }
+    }
+
+    /** 残りの制限時間（0 より小さくはしない）。 */
+    private static Duration remaining(long deadline) {
+        return Duration.ofNanos(Math.max(0L, deadline - System.nanoTime()));
+    }
+
+    /**
+     * 1回の送信と返事の読み取り。返事は別のスレッドで読み、残りの制限時間を過ぎたら通信を閉じる。
+     * 401 のときは UnauthorizedException を投げる（呼び出し側が更新してやり直すかを決める）。
+     */
+    private String send(ChatGptCredentials credentials, String body, long deadline) {
+        Duration left = remaining(deadline);
+        if (left.isZero()) {
+            throw timedOut();
+        }
         HttpRequest request = HttpRequest.newBuilder(responsesUri)
-                .timeout(timeout)
+                .timeout(left)
                 .header("Authorization", "Bearer " + credentials.accessToken())
                 .header("Content-Type", "application/json; charset=utf-8")
                 .header("Accept", "text/event-stream")
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody(instructions, input), StandardCharsets.UTF_8))
+                .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
                 .build();
 
         // 返事は別のスレッドで読む。制限時間を過ぎたら、読んでいる途中でも通信を閉じられるようにするため
@@ -135,11 +171,10 @@ public class ChatGptAiClient implements AiClient {
         worker.setDaemon(true);
         worker.start();
         try {
-            return task.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+            return task.get(left.toNanos(), TimeUnit.NANOSECONDS);
         } catch (TimeoutException e) {
             stopReading(task, bodyRef);
-            log.warn("AI の返事が制限時間内に終わりませんでした");
-            throw new AiException("AI の返事が制限時間内に終わりませんでした。時間をおいてから、もう一度お試しください。");
+            throw timedOut();
         } catch (ExecutionException e) {
             throw toAiException(e.getCause());
         } catch (InterruptedException e) {
@@ -149,15 +184,10 @@ public class ChatGptAiClient implements AiClient {
         }
     }
 
-    /** サインイン情報を読む。無い・期限切れのときは、通信せずに例外にする。 */
-    private ChatGptCredentials usableCredentials() {
-        ChatGptCredentials credentials = store.load()
-                .orElseThrow(() -> new AiException("ChatGPT にサインインしていません。サインインしてから、もう一度お試しください。"));
-        if (!credentials.expiresAt().isAfter(clock.instant())) {
-            // 期限切れの更新は今は行わない（更新は別の機能で扱う）
-            throw new AiException("ChatGPT のサインインの期限が切れました。サインインし直してください。");
-        }
-        return credentials;
+    /** 返事全体の制限時間を過ぎたときの例外（ログも残す。文言に内容は入れない）。 */
+    private static AiException timedOut() {
+        log.warn("AI の返事が制限時間内に終わりませんでした");
+        return new AiException("AI の返事が制限時間内に終わりませんでした。時間をおいてから、もう一度お試しください。");
     }
 
     /**
@@ -193,6 +223,10 @@ public class ChatGptAiClient implements AiClient {
                 // 本文はそのまま出さず、原因の項目（code・type・param など）だけをログに足す。reader はまだ何も読んでいない
                 String detail = errorDetail(response.body());
                 log.warn("ChatGPT の AI 呼び出しがエラーを返しました：status={}{}", response.statusCode(), detail);
+                if (response.statusCode() == 401) {
+                    // 401 は、トークンを更新してやり直せるように別の型にする
+                    throw new UnauthorizedException();
+                }
                 throw new AiException(messageFor(response.statusCode()));
             }
             return readEvents(reader);
@@ -296,6 +330,17 @@ public class ChatGptAiClient implements AiClient {
             case 503 -> "AI が混み合っています。時間をおいてから、もう一度お試しください。";
             default -> "AI の呼び出しに失敗しました（HTTP " + status + "）。";
         };
+    }
+
+    /**
+     * AI が 401（サインインの無効）を返したときの例外。文言は 401 のものと同じ。
+     * generate の中で、トークンを1回だけ更新してやり直すかどうかの判断に使う。
+     */
+    private static final class UnauthorizedException extends AiException {
+
+        UnauthorizedException() {
+            super(messageFor(401));
+        }
     }
 
     /** 読んでいる途中の通信を閉じて、読むスレッドを止める。 */
