@@ -3,6 +3,7 @@ package com.creepycode.common.ai.chatgpt;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -35,6 +36,7 @@ import ch.qos.logback.core.read.ListAppender;
 import com.creepycode.common.ai.AiClient;
 import com.creepycode.common.ai.DummyAiClient;
 import com.creepycode.common.exception.AiException;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
@@ -273,6 +275,23 @@ class ChatGptAiClientTest {
         assertThat(warnings().get(0))
                 .endsWith("ChatGPT の AI 呼び出しがエラーを返しました：status=400")
                 .doesNotContain(INPUT);
+    }
+
+    @Test
+    void 返事の_data行がJSONでないときは_形式エラーの例外になり_原因を持ち_文言に内容を出さない() throws IOException {
+        signIn(EXPIRES_LATER);
+        String reply = "REPLY-SECRET-555";
+        responder = exchange -> sseOk(exchange, "data: " + reply + "\n\n");
+
+        Throwable thrown = catchThrowable(() -> client(Duration.ofSeconds(30)).generate(INSTRUCTIONS, INPUT));
+
+        assertThat(thrown)
+                .isInstanceOf(AiException.class)
+                .hasMessage("AI の返事の形が想定と違いました。")
+                .hasMessageNotContaining(reply)
+                .hasMessageNotContaining(INSTRUCTIONS)
+                .hasMessageNotContaining(INPUT);
+        assertThat(thrown.getCause()).isInstanceOf(JsonProcessingException.class);
     }
 
     @Test
