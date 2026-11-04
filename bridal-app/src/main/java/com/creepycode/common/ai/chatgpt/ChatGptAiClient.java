@@ -125,13 +125,21 @@ public class ChatGptAiClient implements AiClient {
     }
 
     /**
-     * Responses API を呼び、返事の文章を返す。返事全体（トークンの更新・やり直しを含む）の制限時間を過ぎたら時間切れの例外にする。
+     * 作るときに決めた制限時間（本番は30秒）で、文章を作らせる。
+     */
+    @Override
+    public String generate(String instructions, String input) {
+        return generate(instructions, input, timeout);
+    }
+
+    /**
+     * Responses API を呼び、返事の文章を返す。返事全体（トークンの更新・やり直しを含む）の制限時間 limit を過ぎたら時間切れの例外にする。
      * トークンは ChatGptTokenProvider で確かめ、期限が近ければ更新する。サインインしていない・更新できないときは通信せずに例外にする。
      * AI が 401 を返したときは、トークンを1回だけ更新してやり直す。2回目の 401 は、そのまま 401 の文言の例外にする。
      */
     @Override
-    public String generate(String instructions, String input) {
-        long deadline = System.nanoTime() + timeout.toNanos();
+    public String generate(String instructions, String input, Duration limit) {
+        long deadline = System.nanoTime() + limit.toNanos();
         String body = requestBody(instructions, input);
         ChatGptCredentials credentials = tokens.usable(remaining(deadline));
         try {
