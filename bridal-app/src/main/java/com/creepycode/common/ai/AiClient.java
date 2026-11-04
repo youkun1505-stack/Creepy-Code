@@ -4,7 +4,7 @@ import java.util.List;
 
 /**
  * AI に文章を作らせる窓口。
- * 設定 app.ai.mode によって、ダミー（固定の文章）か本物（中継プログラム経由）かが切り替わる。
+ * 設定 app.ai.mode によって、ダミー（固定の文章）か本物（ChatGPT のサインイン情報で Responses API を直接呼ぶ）かが切り替わる。
  */
 public interface AiClient {
 
