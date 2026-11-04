@@ -1,5 +1,6 @@
 package com.creepycode.plan.service;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -23,6 +24,12 @@ public class PlanDraftAiService {
     /** AI への指示。返してほしい JSON の形と、書き方の決まりを伝える。 */
     static final String INSTRUCTIONS = buildInstructions();
 
+    /**
+     * プランを作るときに AI の返事を待つ制限時間（10分）。AI に相談のチャット（30秒）より長く待つ。
+     * 30秒の「時間がかかっています」の表示とは別の値（表示は plan.js の SLOW_AFTER_MS）。
+     */
+    static final Duration AI_TIMEOUT = Duration.ofMinutes(10);
+
     private final AiClient aiClient;
     private final ObjectMapper objectMapper;
 
@@ -34,12 +41,13 @@ public class PlanDraftAiService {
     /**
      * 材料をもとに、AI にプランの大枠と価値観の要点を作らせ、返事（JSON の文章）を返す。
      * ダミーモードのときは AI を呼ばずに固定の JSON を返す。AI の呼び出しに失敗したときは AiException がそのまま出る。
+     * 本物の AI の返事は、AI_TIMEOUT（10分）まで待つ。
      */
     public String requestDraft(PlanMaterial material) {
         if (isDummyMode()) {
             return dummyDraft();
         }
-        return aiClient.generate(INSTRUCTIONS, material.toAiInput());
+        return aiClient.generate(INSTRUCTIONS, material.toAiInput(), AI_TIMEOUT);
     }
 
     /**

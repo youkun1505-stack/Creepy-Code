@@ -1,5 +1,6 @@
 package com.creepycode.common.ai;
 
+import java.time.Duration;
 import java.util.List;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -25,6 +26,12 @@ public class DummyAiClient implements AiClient {
     /** 指示や入力の内容にかかわらず、固定の文章を返す。 */
     @Override
     public String generate(String instructions, String input) {
+        return DUMMY_RESPONSE;
+    }
+
+    /** 制限時間は使わず、指示や入力の内容にかかわらず、固定の文章を返す（ダミーでは AI を呼ばない）。 */
+    @Override
+    public String generate(String instructions, String input, Duration timeout) {
         return DUMMY_RESPONSE;
     }
 

@@ -2,11 +2,13 @@ package com.creepycode.plan.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -60,19 +62,24 @@ class PlanDraftAiServiceTest {
     @Test
     void 本物のときはAIに指示と材料を渡し_返事をそのまま返す() {
         AiClient aiClient = mock(AiClient.class);
-        when(aiClient.generate(anyString(), anyString())).thenReturn("{\"draft\":{}}");
+        when(aiClient.generate(anyString(), anyString(), any(Duration.class))).thenReturn("{\"draft\":{}}");
         PlanDraftAiService service = new PlanDraftAiService(aiClient, objectMapper);
 
         String json = service.requestDraft(material);
 
         assertThat(json).isEqualTo("{\"draft\":{}}");
-        verify(aiClient).generate(PlanDraftAiService.INSTRUCTIONS, material.toAiInput());
+        verify(aiClient).generate(PlanDraftAiService.INSTRUCTIONS, material.toAiInput(), Duration.ofMinutes(10));
+    }
+
+    @Test
+    void プラン生成のAIの返事は最大10分まで待つ() {
+        assertThat(PlanDraftAiService.AI_TIMEOUT).isEqualTo(Duration.ofMinutes(10));
     }
 
     @Test
     void 本物のときAIの失敗はAiExceptionのまま出る() {
         AiClient aiClient = mock(AiClient.class);
-        when(aiClient.generate(anyString(), anyString())).thenThrow(new AiException("時間切れ"));
+        when(aiClient.generate(anyString(), anyString(), any(Duration.class))).thenThrow(new AiException("時間切れ"));
         PlanDraftAiService service = new PlanDraftAiService(aiClient, objectMapper);
 
         assertThatThrownBy(() -> service.requestDraft(material)).isInstanceOf(AiException.class);

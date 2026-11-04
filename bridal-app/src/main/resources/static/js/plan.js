@@ -15,14 +15,14 @@ document.querySelectorAll('[data-plan-generating]').forEach((page) => {
 
     // 基本設計書 6-5：30秒以内に終わらなければ「時間がかかっています」を出す
     const SLOW_AFTER_MS = 30000;
-    // 1回の問い合わせを打ち切るまでの時間。AI の待ち（30秒）より長くして、ふつうは返事を待てるようにする
-    const REQUEST_TIMEOUT_MS = 60000;
+    // 1回の問い合わせを打ち切るまでの時間（11分）。サーバーはプラン生成の AI の返事を最大10分待つので、それより長くして返事を待てるようにする
+    const REQUEST_TIMEOUT_MS = 660000;
     // 作っている最中だったときに、もう一度聞くまでの待ち時間
     const RUNNING_RETRY_MS = 3000;
     // 通信の失敗などが何回続いたら、プランナーに頼む案内を出すか（サーバーの数え方と同じ3回）
     const MAX_CLIENT_FAILURES = 3;
-    // 「作っている最中」が続いても、この時間を超えたら待つのをやめて失敗として扱う（サーバーが止まったときの逃げ道）
-    const MAX_RUNNING_MS = 90000;
+    // 「作っている最中」が続いても、この時間（11分）を超えたら待つのをやめて失敗として扱う（サーバーが止まったときの逃げ道）。AI の最大10分より長くする
+    const MAX_RUNNING_MS = 660000;
 
     const csrfToken = document.querySelector('meta[name="_csrf"]');
     const csrfHeader = document.querySelector('meta[name="_csrf_header"]');
