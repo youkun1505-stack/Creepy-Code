@@ -160,12 +160,19 @@ public class ChatGptAiClient implements AiClient {
         return credentials;
     }
 
-    /** 送る本文（JSON）。store:false を毎回送り、送ってはいけない項目（temperature など）は入れない。 */
+    /**
+     * 送る本文（JSON）。store:false を毎回送り、送ってはいけない項目（temperature など）は入れない。
+     * input は公式の指定どおり配列にし、役割が user のメッセージを1つだけ入れる。
+     */
     private String requestBody(String instructions, String input) {
+        Map<String, Object> message = new LinkedHashMap<>();
+        message.put("role", "user");
+        message.put("content", input);
+
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", model);
         body.put("instructions", instructions);
-        body.put("input", input);
+        body.put("input", List.of(message));
         body.put("stream", true);
         body.put("store", false);
         try {

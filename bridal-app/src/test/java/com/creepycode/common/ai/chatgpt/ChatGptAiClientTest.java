@@ -112,7 +112,14 @@ class ChatGptAiClientTest {
         JsonNode body = JSON.readTree(requests.get(0).body());
         assertThat(body.path("model").asText()).isEqualTo("gpt-test");
         assertThat(body.path("instructions").asText()).isEqualTo(INSTRUCTIONS);
-        assertThat(body.path("input").asText()).isEqualTo(INPUT);
+        // input は配列で、役割が user・内容が渡した文章のメッセージを1つだけ持つ
+        JsonNode input = body.path("input");
+        assertThat(input.isArray()).isTrue();
+        assertThat(input.size()).isEqualTo(1);
+        JsonNode message = input.get(0);
+        assertThat(message.size()).isEqualTo(2);
+        assertThat(message.path("role").asText()).isEqualTo("user");
+        assertThat(message.path("content").asText()).isEqualTo(INPUT);
         assertThat(body.get("stream").toString()).isEqualTo("true");
         assertThat(body.get("store").toString()).isEqualTo("false");
         // 送ってはいけない項目（公式の制限）を送らない
