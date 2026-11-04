@@ -140,6 +140,25 @@
         send(pendingContent);
     });
 
+    // 入力欄で Ctrl + Enter（Mac は Command + Enter）を押したら送信する
+    input.addEventListener('keydown', function (event) {
+        // 日本語入力（IME）の変換確定中の Enter は送信しない
+        if (event.isComposing || event.keyCode === 229) {
+            return;
+        }
+        if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+            event.preventDefault();
+            if (busy || submitButton.disabled) {
+                return;
+            }
+            if (typeof form.requestSubmit === 'function') {
+                form.requestSubmit(submitButton);
+            } else {
+                form.dispatchEvent(new Event('submit', { cancelable: true }));
+            }
+        }
+    });
+
     input.addEventListener('input', updateCount);
     updateCount();
     scrollToLatest();

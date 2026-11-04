@@ -4,7 +4,7 @@
 
 ## 決まったこと（decisions/）
 
-- （まだありません）
+- [AI サービスを Gemini API から Sign in with ChatGPT に変更](decisions/ai-service-chatgpt.md) — AI 呼び出し（P-10 など）の開発・設定・実行（2026-10-14）
 
 ## 確かめた知識（knowledge/）
 

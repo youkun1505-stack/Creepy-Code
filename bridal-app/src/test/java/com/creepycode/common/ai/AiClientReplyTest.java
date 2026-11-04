@@ -6,9 +6,11 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
+import com.creepycode.common.ai.chatgpt.ChatGptAiClient;
+
 /**
  * やり取りを渡して返事を受け取る呼び出し（generateReply）のテスト。
- * 本物の中継プログラムは呼ばず、履歴を入力の文章にまとめる処理だけを確かめる。
+ * 本物の AI は呼ばず、履歴を入力の文章にまとめる処理だけを確かめる。
  */
 class AiClientReplyTest {
 
@@ -20,13 +22,13 @@ class AiClientReplyTest {
     }
 
     @Test
-    void 中継プログラム用の入力文章は_利用者とAIの発言を古い順に並べる() {
+    void AIに渡す入力文章は_利用者とAIの発言を古い順に並べる() {
         List<ChatTurn> history = List.of(
                 new ChatTurn("USER", "最初の質問"),
                 new ChatTurn("AI", "最初の返事"),
                 new ChatTurn("USER", "今回の質問\n2行目"));
 
-        String text = RelayAiClient.toInputText(history);
+        String text = ChatGptAiClient.toInputText(history);
 
         assertThat(text).contains("利用者：最初の質問\nAI：最初の返事\n利用者：今回の質問\n2行目\n");
         assertThat(text.indexOf("最初の質問")).isLessThan(text.indexOf("最初の返事"));

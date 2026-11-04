@@ -6,7 +6,7 @@ Codex はこのファイルを直接読みます。Claude Code は `.claude/CLAU
 
 ## 1. プロジェクト
 
-- AIブライダルプランニング支援システム（チーム名：Creepy Code）。アプリ本体は `bridal-app/`（Java 17 / Spring Boot 3.5 / Maven / Thymeleaf / Oracle）。
+- AIブライダルプランニング支援システム（チーム名：Creepy Code）。アプリ本体は `bridal-app/`（Java 17 / Spring Boot 3.5 / Maven / Thymeleaf / PostgreSQL）。
 - 命名・パッケージ構成・書き方は `docs/04_開発ルール/コーディング規約.md` に従う。
 - Spring の実装順：テーブル確認 → Entity → Repository → Service → Controller → 画面 → 動作確認。
 - 確認用のテスト：`bridal-app` フォルダで `mvnw.cmd -q test`（Windows）。テストがまだ無い機能は「確認できていない」と正直に書く。
@@ -175,7 +175,7 @@ Codex はこのファイルを直接読みます。Claude Code は `.claude/CLAU
 ## 6. 変更してはいけないもの
 
 - `AGENTS.md`・`.claude/`・`.codex/`・`.githooks/`・`.gitignore`・`.gitattributes`（リーダーに頼まれたときだけ）
-- 秘密情報：API キーをどこにも書かない（Gemini の API キーは環境変数 `GEMINI_API_KEY`）。`.env` などを読まない。
+- 秘密情報：API キーをどこにも書かない。AI は Sign in with ChatGPT を使い、API キーは使わない。サインインの情報（`npm run sign-in` で `%USERPROFILE%\.creepy-code` に作られる）をリポジトリに入れない・読まない。`.env` などを読まない。
 - `docs/` の Word・PowerPoint・Excel ファイル
 - `db/保留/` の SQL を実行しない。授業用の DB ユーザーとテーブルに触らない。
 
