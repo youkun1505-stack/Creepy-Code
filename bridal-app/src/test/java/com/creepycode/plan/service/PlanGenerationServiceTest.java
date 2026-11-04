@@ -2,7 +2,6 @@ package com.creepycode.plan.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -11,8 +10,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -50,7 +47,6 @@ class PlanGenerationServiceTest {
     private final PlanRepository planRepository = mock(PlanRepository.class);
     private final PlanMaterialService materialService = mock(PlanMaterialService.class);
     private final PlanDraftAiService draftAiService = mock(PlanDraftAiService.class);
-    private final ConversationLogService conversationLogService = mock(ConversationLogService.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final PlanDraftJson draftJson = new PlanDraftJson(objectMapper);
 
@@ -64,7 +60,7 @@ class PlanGenerationServiceTest {
     @BeforeEach
     void setUp() {
         service = new PlanGenerationService(answerRepository, planRepository, materialService, draftAiService,
-                draftJson, conversationLogService);
+                draftJson);
         when(materialService.build(eq(USER_ID), any())).thenReturn(material);
         when(planRepository.findFirstByUserIdOrderByCreatedAtDesc(USER_ID)).thenReturn(Optional.empty());
         // 保存したときの状態を記録し、新しい行には番号を振る（DB の自動採番の代わり）
@@ -126,18 +122,16 @@ class PlanGenerationServiceTest {
         assertThat(draftJson.readDraft(plan.getAiDraft()).items()).hasSize(PlanItem.values().length);
         assertThat(draftJson.readValues(plan.getValueSummary()).important()).isNotEmpty();
         verify(materialService).build(USER_ID, answer);
-        verify(conversationLogService).record(eq(USER_ID), eq(NEW_PLAN_ID), eq(material), any(), any());
     }
 
     @Test
-    void はじめてでAIが失敗したら_CREATINGの行は残り中身は空のまま_mdも書かない() {
+    void はじめてでAIが失敗したら_CREATINGの行は残り中身は空のまま() {
         latestAnswer(10L, "");
         when(draftAiService.requestDraft(material)).thenThrow(new AiException("時間切れ"));
 
         assertThat(service.generate(USER_ID)).isEqualTo(PlanGenerationResult.FAILED);
 
         assertThat(savedStatuses).containsExactly(PlanStatus.CREATING);
-        verify(conversationLogService, never()).record(anyLong(), anyLong(), any(), any(), any());
     }
 
     @Test
@@ -200,7 +194,6 @@ class PlanGenerationServiceTest {
         assertThat(plan.getAnswerId()).isEqualTo(11L);
         assertThat(plan.getAiDraft()).doesNotContain("前の中身");
         assertThat(plan.getStatus()).isEqualTo(PlanStatus.CUSTOMER_DRAFT_REVIEW);
-        verify(conversationLogService).record(eq(USER_ID), eq(7L), eq(material), any(), any());
     }
 
     @Test
@@ -218,17 +211,6 @@ class PlanGenerationServiceTest {
     }
 
     @Test
-    void mdを書けなくてもプランはできたことにする() {
-        latestAnswer(10L, "");
-        when(draftAiService.requestDraft(material)).thenReturn(validResponse);
-        doThrow(new UncheckedIOException(new IOException("書けない")))
-                .when(conversationLogService).record(anyLong(), anyLong(), any(), any(), any());
-
-        assertThat(service.generate(USER_ID)).isEqualTo(PlanGenerationResult.GENERATED);
-        assertThat(savedStatuses).containsExactly(PlanStatus.CREATING, PlanStatus.CUSTOMER_DRAFT_REVIEW);
-    }
-
-    @Test
     void AIを待つあいだにプランナーへ送られていたら_上書きしない() {
         latestAnswer(11L, "会場");
         Plan plan = plan(7L, 10L, PlanStatus.CUSTOMER_DRAFT_REVIEW, "{\"items\":[\"前の中身\"]}");
@@ -240,7 +222,6 @@ class PlanGenerationServiceTest {
 
         assertThat(service.generate(USER_ID)).isEqualTo(PlanGenerationResult.SENT_TO_PLANNER);
         verify(planRepository, never()).save(any());
-        verify(conversationLogService, never()).record(anyLong(), anyLong(), any(), any(), any());
     }
 
     @Test

@@ -1,6 +1,5 @@
 package com.creepycode.plan.service;
 
-import java.io.UncheckedIOException;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Objects;
@@ -20,7 +19,7 @@ import com.creepycode.plan.entity.PlanStatus;
 import com.creepycode.plan.repository.PlanRepository;
 
 /**
- * プランの大枠を AI に作らせて、PLANS に保存する（作り直しも同じ）。あわせて会話履歴の md を書く。
+ * プランの大枠を AI に作らせて、PLANS に保存する（作り直しも同じ）。
  * AI を待つあいだ DB 接続を握らないよう、このクラスのメソッドはトランザクションで包まない
  * （接続は1人2本までのため。application.properties の hikari.maximum-pool-size）。
  */
@@ -34,20 +33,17 @@ public class PlanGenerationService {
     private final PlanMaterialService materialService;
     private final PlanDraftAiService draftAiService;
     private final PlanDraftJson draftJson;
-    private final ConversationLogService conversationLogService;
 
     // いまプランを作っている顧客（USER_ID）。アプリ1つの中で、同じ顧客の生成が重ならないようにする
     private final Map<Long, Boolean> running = new ConcurrentHashMap<>();
 
     public PlanGenerationService(OnboardingAnswerRepository answerRepository, PlanRepository planRepository,
-            PlanMaterialService materialService, PlanDraftAiService draftAiService, PlanDraftJson draftJson,
-            ConversationLogService conversationLogService) {
+            PlanMaterialService materialService, PlanDraftAiService draftAiService, PlanDraftJson draftJson) {
         this.answerRepository = answerRepository;
         this.planRepository = planRepository;
         this.materialService = materialService;
         this.draftAiService = draftAiService;
         this.draftJson = draftJson;
-        this.conversationLogService = conversationLogService;
     }
 
     /** プランを作れる（STEP4 まで答えている＝いちばん新しい回答の UNDECIDED_TAGS が NULL でない）かを返す。 */
@@ -128,15 +124,7 @@ public class PlanGenerationService {
         plan.setValueSummary(draftJson.toValuesJson(parsed.values()));
         plan.setStatus(PlanStatus.CUSTOMER_DRAFT_REVIEW);
         plan.setUpdatedAt(LocalDateTime.now());
-        Plan saved = planRepository.save(plan);
-
-        try {
-            conversationLogService.record(userId, saved.getPlanId(), material, parsed.draft(), parsed.values());
-        } catch (UncheckedIOException e) {
-            // md は記録用なので、書けなくてもプランはできたものとして進める。
-            // 書けなかった回の記録は戻らない（ログに残すだけ）。次に作り直したときは、その回の分が書かれる
-            LOGGER.error("会話履歴の md を書けませんでした（userId={}, planId={}）", userId, saved.getPlanId(), e);
-        }
+        planRepository.save(plan);
         return PlanGenerationResult.GENERATED;
     }
 
