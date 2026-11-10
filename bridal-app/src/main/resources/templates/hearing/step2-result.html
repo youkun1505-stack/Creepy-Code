@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ja" xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{common/layout}">
+<head>
+    <title>あなたの好み</title>
+    <link rel="stylesheet" th:href="@{/css/hearing.css}">
+</head>
+<body>
+    <!-- かんたん質問 STEP2 のまとめ。好きなテイストと、そのなかの細かい好み（2回目の答え）を出す
+         （組み立てるのは HearingVisualService。AI は使わない） -->
+    <main layout:fragment="content" class="container hearing-page">
+
+        <nav th:replace="~{common/hearing-progress :: progress}"></nav>
+
+        <h1 class="hearing-title">あなたの好み</h1>
+
+        <!-- 好きなテイストがあるとき -->
+        <th:block th:unless="${summary.isEmpty()}">
+            <!-- 見出しの文は HearingVisualService が作って渡す（画面側では組み立てない） -->
+            <p class="hearing-result__headline" th:text="${summary.headline()}">「ナチュラル」と「和」が好きなようです</p>
+            <ul class="hearing-result__list">
+                <li class="hearing-result__row" th:each="taste : ${summary.tasteResults()}">
+                    <span class="hearing-result__label" th:text="${taste.label()}">和</span>
+                    <span class="hearing-result__detail" th:text="${taste.detailText()}">なかでも「和モダン」寄りです</span>
+                </li>
+            </ul>
+            <p class="hearing-lead">この結果は、プランを作るときの手がかりにします。</p>
+        </th:block>
+
+        <!-- 好きなテイストが無かったとき -->
+        <p class="hearing-result__headline" th:if="${summary.isEmpty()}">
+            今回はピンとくる写真がなかったようです。それも大事な答えです。
+        </p>
+
+        <div class="hearing-actions">
+            <a class="btn hearing-button hearing-button--secondary" th:href="@{/hearing/step2}">選び直す</a>
+            <a class="btn hearing-button hearing-button--primary" th:href="@{${nextUrl}}">次へ</a>
+        </div>
+
+    </main>
+</body>
+</html>

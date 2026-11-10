@@ -292,6 +292,21 @@ main.top-page {
     margin-bottom: 1.5rem;
 }
 
+/* 回答が変わったときの、作り直しの案内 */
+.top-next__changed {
+    max-width: 32em;
+    margin-top: 1.25rem;
+    padding: 1rem 1.25rem;
+    border-left: 4px solid var(--top-color-accent);
+    border-radius: 0.5rem;
+    background-color: var(--top-color-surface);
+}
+
+.top-next__changed-text {
+    margin: 0 0 0.75rem;
+    font-weight: 700;
+}
+
 .top-next__ai {
     max-width: 32em;
     margin-top: 1.5rem;

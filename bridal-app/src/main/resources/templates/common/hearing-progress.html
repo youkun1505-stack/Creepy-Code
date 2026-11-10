@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="ja" xmlns:th="http://www.thymeleaf.org">
+<body>
+    <!-- かんたん質問（STEP1〜4）の進み具合。使う画面に progressSteps と currentStep を渡す（HearingController）。
+         済み／いまここ／まだ は HearingController で決めて渡す（画面側では判定しない） -->
+    <nav th:fragment="progress" class="hearing-progress" aria-label="かんたん質問の進み具合">
+        <p class="hearing-progress__count">
+            かんたん質問 <span th:text="${currentStep}">1</span>/<span th:text="${#lists.size(progressSteps)}">4</span>
+        </p>
+        <ol class="hearing-progress__list">
+            <li class="hearing-progress__step" th:each="step, stat : ${progressSteps}"
+                th:classappend="${'is-' + step.status()}"
+                th:attr="aria-current=${step.status() == 'current'} ? 'step' : null">
+                <span class="hearing-progress__mark" aria-hidden="true" th:text="${stat.count}">1</span>
+                <span class="hearing-progress__label" th:text="${step.label()}">どんな式</span>
+            </li>
+        </ol>
+    </nav>
+</body>
+</html>
