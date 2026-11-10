@@ -334,6 +334,38 @@ class ChatGptAiClientTest {
     }
 
     @Test
+    void 呼ぶときに渡した制限時間で_作るときの制限時間より優先して_時間切れの例外になる() throws IOException {
+        signIn(EXPIRES_LATER);
+        // 作るときの制限時間は30秒。渡した0.5秒で締め切られることを確かめる（止まった返事は解放されるまで何も送らない）
+        responder = exchange -> sseStallAfter(exchange, "event: response.output_text.delta\ndata: " + delta("途中") + "\n\n");
+        ChatGptAiClient client = client(Duration.ofSeconds(30));
+
+        long start = System.nanoTime();
+        assertThatThrownBy(() -> client.generate(INSTRUCTIONS, INPUT, Duration.ofMillis(500)))
+                .isInstanceOf(AiException.class)
+                .hasMessageContaining("制限時間内に終わりませんでした")
+                .hasMessageNotContaining(TOKEN)
+                .hasMessageNotContaining(INSTRUCTIONS)
+                .hasMessageNotContaining(INPUT);
+        assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(5));
+    }
+
+    @Test
+    void 長い制限時間を渡しても_今までどおりの本文と送る項目で_文章を返す() throws IOException {
+        signIn(EXPIRES_LATER);
+        responder = exchange -> sseOk(exchange, sse(delta("長く待った"), completed()));
+
+        String reply = client(Duration.ofSeconds(30)).generate(INSTRUCTIONS, INPUT, Duration.ofMinutes(10));
+
+        assertThat(reply).isEqualTo("長く待った");
+        assertThat(requests).hasSize(1);
+        JsonNode body = JSON.readTree(requests.get(0).body());
+        assertThat(body.path("instructions").asText()).isEqualTo(INSTRUCTIONS);
+        assertThat(body.path("input").get(0).path("content").asText()).isEqualTo(INPUT);
+        assertThat(body.get("store").toString()).isEqualTo("false");
+    }
+
+    @Test
     void app_ai_modeがchatgptならChatGptAiClient_dummyならDummyAiClientになる() {
         new ApplicationContextRunner()
                 .withUserConfiguration(ChatGptAiClient.class, DummyAiClient.class)

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ja" xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{common/layout}">
+<head>
+    <title>マイプラン</title>
+    <link rel="stylesheet" th:href="@{/css/plan.css}">
+</head>
+<body>
+    <!-- マイプラン（P-12）：AI が作ったプランの大枠（11項目）と、価値観の要点を表示する（今回は表示だけ） -->
+    <main layout:fragment="content" class="container plan-page plan-myplan">
+
+        <div class="plan-myplan__head">
+            <h1 class="plan-title">マイプラン</h1>
+            <p class="plan-status">
+                <span class="plan-status__label">いまの状態</span>
+                <span class="plan-status__value" th:text="${plan.statusLabel()}">AI提案確認中</span>
+            </p>
+        </div>
+        <p class="plan-lead">
+            AIが、かんたん質問の答えとAIへの相談の内容から作った、結婚式のたたき台です。<br>
+            これをもとに、担当プランナーと一緒に、くわしいプランを決めていきます。
+        </p>
+
+        <!-- STEP をやり直して、プランの元になった回答より新しい回答があるとき -->
+        <div class="plan-notice plan-notice--changed" th:if="${plan.answersChanged()}" role="status">
+            <p class="plan-notice__text">回答が変わっています。プランを作り直しますか？</p>
+            <p class="plan-notice__text plan-notice__sub">作り直すまでは、いまのプランのままです。</p>
+            <a class="btn plan-button plan-button--primary" th:href="@{/plan/generating}">作り直す</a>
+        </div>
+
+        <!-- 保存されたプランを読めなかったとき -->
+        <div class="plan-notice plan-notice--error" th:unless="${plan.readable()}" role="alert">
+            <p class="plan-notice__text">
+                プランを表示できませんでした。お手数ですが、お店にお問い合わせください。
+            </p>
+        </div>
+
+        <div class="plan-myplan__body" th:if="${plan.readable()}">
+            <!-- 左：プランの大枠（11項目） -->
+            <section class="plan-draft" aria-labelledby="planDraftTitle">
+                <h2 class="plan-section-title" id="planDraftTitle">プランの大枠</h2>
+                <ol class="plan-draft__list">
+                    <li class="plan-draft__item" th:each="item : ${plan.items()}"
+                        th:attr="data-plan-item=${item.key()}">
+                        <h3 class="plan-draft__label" th:text="${item.label()}">コンセプト</h3>
+                        <p class="plan-draft__proposal" th:text="${item.proposal()}">提案</p>
+                        <p class="plan-draft__reason">
+                            <span class="plan-draft__reason-label">そう考えた理由</span>
+                            <span class="plan-draft__reason-text" th:text="${item.reason()}">理由</span>
+                        </p>
+                    </li>
+                </ol>
+            </section>
+
+            <!-- 右：価値観の要点（プランナーへの申し送りにも使う） -->
+            <aside class="plan-values" aria-labelledby="planValuesTitle">
+                <h2 class="plan-section-title" id="planValuesTitle">あなたの価値観の要点</h2>
+
+                <h3 class="plan-values__title">大事にしていること</h3>
+                <ul class="plan-values__list">
+                    <li th:each="point : ${plan.important()}">
+                        <span class="plan-values__item" th:text="${point.item()}">写真</span>
+                        <span class="plan-values__reason" th:if="${!#strings.isEmpty(point.reason())}"
+                              th:text="${point.reason()}">理由</span>
+                    </li>
+                </ul>
+
+                <h3 class="plan-values__title">削ってもよい部分</h3>
+                <ul class="plan-values__list" th:unless="${#lists.isEmpty(plan.removable())}">
+                    <li th:each="point : ${plan.removable()}">
+                        <span class="plan-values__item" th:text="${point.item()}">引出物</span>
+                        <span class="plan-values__reason" th:if="${!#strings.isEmpty(point.reason())}"
+                              th:text="${point.reason()}">理由</span>
+                    </li>
+                </ul>
+                <p class="plan-values__none" th:if="${#lists.isEmpty(plan.removable())}">特にありません</p>
+
+                <h3 class="plan-values__title">削ってよい順</h3>
+                <ol class="plan-values__order" th:unless="${#lists.isEmpty(plan.removalOrder())}">
+                    <li th:each="name : ${plan.removalOrder()}" th:text="${name}">引出物</li>
+                </ol>
+                <p class="plan-values__none" th:if="${#lists.isEmpty(plan.removalOrder())}">特にありません</p>
+            </aside>
+        </div>
+
+        <p class="plan-note">プランナーに相談する機能は、準備中です。</p>
+        <p class="plan-back"><a th:href="@{/}">トップに戻る</a></p>
+    </main>
+</body>
+</html>
