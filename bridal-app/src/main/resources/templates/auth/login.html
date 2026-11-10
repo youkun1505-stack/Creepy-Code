@@ -64,6 +64,25 @@
                     <button type="submit" class="btn auth-button">ログイン</button>
                 </form>
 
+                <!-- 管理者・プランナー画面が未実装のため、デモ用の表示ボタンのみ置く -->
+                <div class="auth-demo-buttons" aria-label="デモ用ログイン">
+                    <button type="button" class="btn auth-button auth-button--secondary">管理者でログイン（デモ）</button>
+                    <button type="button" class="btn auth-button auth-button--secondary">プランナーでログイン（デモ）</button>
+                </div>
+
+                <form class="auth-form auth-demo-login" th:if="${demoLoginEnabled}"
+                      th:action="@{/auth/login/demo}" th:object="${demoLoginForm}" method="post">
+                    <div class="auth-form__field">
+                        <label class="auth-form__label" for="demoName">デモ表示名</label>
+                        <input id="demoName" type="text" class="form-control auth-form__input"
+                               th:field="*{name}" maxlength="100" required>
+                        <p class="auth-form__error" th:if="${#fields.hasErrors('name')}" th:errors="*{name}"></p>
+                        <div class="auth-form__summary" role="alert" th:if="${#fields.hasGlobalErrors()}"
+                             th:text="${#fields.globalErrors()[0]}">デモログインできませんでした</div>
+                    </div>
+                    <button type="submit" class="btn auth-button auth-button--secondary">一般ユーザーでログイン（デモ）</button>
+                </form>
+
                 <p class="auth-card__switch">はじめての方は<a class="auth-card__switch-link" th:href="@{${registerUrl}}">会員登録</a></p>
             </section>
 
