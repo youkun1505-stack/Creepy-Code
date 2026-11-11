@@ -1,20 +1,17 @@
 package com.creepycode.common.ai.chatgpt;
 
-import java.awt.Desktop;
-import java.io.IOException;
 import java.io.PrintStream;
-import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
 import java.util.Optional;
 
 /**
  * Sign in with ChatGPT の操作（サインイン・状態の表示・サインアウト）。Spring は起動しない（ChatGptSignInMain から呼ぶ）。
- * サインインは、戻り先の受け口を先に待ち受けてからブラウザを開き、戻りを受けて交換し、
- * ID トークンを確かめてから、登録情報と資格情報を保存する。確かめに通らなければ何も保存しない。
+ * サインインは、戻り先の受け口を先に待ち受けてから、サインイン用の URL を画面に出し、
+ * 利用者がブラウザに貼り付けて戻りを受けて交換し、ID トークンを確かめてから、登録情報と資格情報を保存する。
+ * 確かめに通らなければ何も保存しない。ブラウザは、このアプリからは開かない。
  * 画面に出すのは表示名と期限だけ（sub・トークン・code・state は出さない）。
  */
 public class ChatGptSignIn {
@@ -22,18 +19,9 @@ public class ChatGptSignIn {
     private static final DateTimeFormatter EXPIRY_FORMAT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.of("Asia/Tokyo"));
 
-    /** ブラウザで URL を開く方法。本物は既定のブラウザ、テストでは開かない差し替えにする。 */
-    @FunctionalInterface
-    public interface Browser {
-
-        /** URL を開く。開けたら true。開けなければ false（呼び出し側が URL を画面に出す）。 */
-        boolean open(String url);
-    }
-
     private final ChatGptCredentialStore store;
     private final ChatGptOAuthClient oauth;
     private final IdTokenVerifier verifier;
-    private final Browser browser;
     private final Duration callbackTimeout;
     private final Clock clock;
     private final PrintStream out;
@@ -42,86 +30,24 @@ public class ChatGptSignIn {
      * @param store           資格情報と登録情報の保存先（本物は既定の保存先と WindowsDpapiProtector）
      * @param oauth           認可 URL の作成とトークン交換（本物は公式の接続先）
      * @param verifier        ID トークンの確かめ（本物は公式の JWKS）
-     * @param browser         認可 URL を開く方法
      * @param callbackTimeout 戻りを待つ時間（本番は5分）
      * @param clock           期限の表示と判定に使う時刻
-     * @param out             画面に出す先（標準出力）
+     * @param out             画面に出す先（標準出力）。サインイン用の URL もここに出す
      */
     public ChatGptSignIn(ChatGptCredentialStore store, ChatGptOAuthClient oauth, IdTokenVerifier verifier,
-            Browser browser, Duration callbackTimeout, Clock clock, PrintStream out) {
+            Duration callbackTimeout, Clock clock, PrintStream out) {
         this.store = store;
         this.oauth = oauth;
         this.verifier = verifier;
-        this.browser = browser;
         this.callbackTimeout = callbackTimeout;
         this.clock = clock;
         this.out = out;
     }
 
     /**
-     * 既定のブラウザで URL を開く。開けなければ false。
-     * Desktop が使えるときは Desktop.browse で開く。使えないとき（Spring の起動は headless になる）は、
-     * Windows なら rundll32 で既定のブラウザを開く。
-     */
-    public static boolean openInDefaultBrowser(String url) {
-        if (desktopBrowseAvailable()) {
-            try {
-                Desktop.getDesktop().browse(URI.create(url));
-                return true;
-            } catch (IOException | RuntimeException e) {
-                return false;
-            }
-        }
-        return openWithWindowsShell(url, System.getProperty("os.name"), ChatGptSignIn::startCommand);
-    }
-
-    /** Desktop で BROWSE が使えるか。headless のときは false。 */
-    private static boolean desktopBrowseAvailable() {
-        try {
-            return Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE);
-        } catch (RuntimeException e) {
-            return false;
-        }
-    }
-
-    /**
-     * Windows の既定のブラウザで URL を開く（rundll32 の FileProtocolHandler を呼ぶ）。
-     * cmd の start は使わない。URL の & が区切りとして解釈されるため。URL は引数1つとして渡す。
-     * Windows 以外と、https:// 以外の URL では何も起動せず false を返す。
-     *
-     * @param url      開く URL
-     * @param osName   OS の名前（本物は os.name）
-     * @param launcher コマンドを起動する方法（本物は ProcessBuilder）
-     */
-    static boolean openWithWindowsShell(String url, String osName, CommandLauncher launcher) {
-        if (osName == null || !osName.startsWith("Windows") || url == null || !url.startsWith("https://")) {
-            return false;
-        }
-        try {
-            launcher.launch(List.of("rundll32", "url.dll,FileProtocolHandler", url));
-            return true;
-        } catch (IOException | RuntimeException e) {
-            // 起動の失敗は種類だけ扱う。URL（state・nonce を含む）は出さない
-            return false;
-        }
-    }
-
-    /** ProcessBuilder でコマンドを起動する。起動できなければ IOException。 */
-    private static void startCommand(List<String> command) throws IOException {
-        new ProcessBuilder(command).start();
-    }
-
-    /** コマンドを起動する部品。テストでは本物を起動せず、渡された内容だけを確かめる。 */
-    @FunctionalInterface
-    interface CommandLauncher {
-
-        /** コマンドを起動する。起動できなければ例外。 */
-        void launch(List<String> command) throws IOException;
-    }
-
-    /**
-     * サインインする。戻り先の受け口を先に待ち受け、ブラウザで認可して戻りを受け、交換して ID トークンを確かめ、
-     * 登録情報と資格情報を保存する。途中で確かめに通らなければ例外にし、何も保存しない。
+     * サインインする。戻り先の受け口を先に待ち受け、サインイン用の URL を画面に出して戻りを待ち、
+     * 戻りを受けて交換し、ID トークンを確かめ、登録情報と資格情報を保存する。
+     * 途中で確かめに通らなければ例外にし、何も保存しない。
      *
      * @param port 戻り先のポート（127.0.0.1 で待ち受ける）
      */
@@ -133,12 +59,8 @@ public class ChatGptSignIn {
 
         try (SignInCallbackServer server = new SignInCallbackServer(port, callbackTimeout)) {
             out.println("ChatGPT のサインインを始めます。戻り先：" + attempt.redirectUri());
-            if (browser.open(attempt.authorizationUrl())) {
-                out.println("ブラウザでサインインしてください。");
-            } else {
-                out.println("ブラウザを自動で開けませんでした。次の URL をブラウザに貼り付けて開いてください。");
-                out.println(attempt.authorizationUrl());
-            }
+            out.println("次の URL をブラウザに貼り付けて開いてください。");
+            out.println(attempt.authorizationUrl());
             out.println("サインインが終わるのを待っています。");
 
             ChatGptCallback callback = server.awaitCallback();

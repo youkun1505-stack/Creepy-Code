@@ -27,7 +27,6 @@ public class ChatGptConfig {
                 store,
                 new ChatGptOAuthClient(ChatGptEndpoints.official()),
                 new IdTokenVerifier(),
-                ChatGptSignIn::openInDefaultBrowser,
                 ChatGptSignInMain.CALLBACK_TIMEOUT,
                 Clock.systemUTC(),
                 System.out);

@@ -112,9 +112,11 @@ class ChatGptSignInTest {
         assertThat(parseForm(exchangeBodies.get(0)))
                 .containsEntry("client_id", CLIENT_ID)
                 .containsEntry("code", "CODE-OK");
+        // サインイン用 URL は画面に出すので、その中の state・nonce だけは許す。それ以外の場所には出ないことを確かめる
         assertThat(printed()).contains(NAME)
-                .doesNotContain(SUBJECT, "ACCESS-SECRET-7", "REFRESH-SECRET-8", "CODE-OK", query.get("state"),
-                        query.get("nonce"));
+                .doesNotContain(SUBJECT, "ACCESS-SECRET-7", "REFRESH-SECRET-8", "CODE-OK");
+        String printedWithoutUrl = printed().replace(browser.urls.get(0), "");
+        assertThat(printedWithoutUrl).doesNotContain(query.get("state"), query.get("nonce"));
     }
 
     @Test
@@ -191,13 +193,14 @@ class ChatGptSignInTest {
     }
 
     @Test
-    void ブラウザが開けなかったときは認可URLを画面に出す() throws IOException {
+    void 認可URLは最初から_貼り付けて開く案内と一緒に画面に出し_自動で開いた時の文は出さない() throws IOException {
         FakeBrowser browser = new FakeBrowser();
-        browser.opens = false;
 
         service(browser, CLOCK).signIn(freePort());
 
-        assertThat(printed()).contains("ブラウザを自動で開けませんでした").contains(browser.urls.get(0));
+        assertThat(printed()).contains("次の URL をブラウザに貼り付けて開いてください。")
+                .contains(browser.urls.get(0))
+                .doesNotContain("ブラウザを自動で開けませんでした", "ブラウザでサインインしてください。");
         assertThat(store.load()).isPresent();
     }
 
@@ -245,13 +248,26 @@ class ChatGptSignInTest {
         assertThat(printed()).contains("消しました");
     }
 
-    private ChatGptSignIn service(ChatGptSignIn.Browser browser, Clock clock) {
+    /**
+     * サインインの操作を作る。画面に出された認可 URL（偽の接続先の認可の行）を、ブラウザの代わり（browser）に渡す。
+     * 本物は利用者がブラウザに貼り付けるが、テストでは貼り付けの代わりに browser が戻りを送る。
+     */
+    private ChatGptSignIn service(FakeBrowser browser, Clock clock) {
         String base = "http://127.0.0.1:" + fake.getAddress().getPort();
         ChatGptEndpoints endpoints = new ChatGptEndpoints(base + "/api/accounts/authorize", base + TOKEN_PATH);
+        PrintStream screen = new PrintStream(output, true, StandardCharsets.UTF_8) {
+            @Override
+            public void println(String line) {
+                super.println(line);
+                if (line != null && line.startsWith(base + "/api/accounts/authorize?")) {
+                    browser.open(line);
+                }
+            }
+        };
         return new ChatGptSignIn(store,
                 new ChatGptOAuthClient(endpoints, HttpClient.newHttpClient(), CLOCK, new SecureRandom()),
                 new IdTokenVerifier(base + JWKS_PATH, HttpClient.newHttpClient(), CLOCK),
-                browser, WAIT, clock, new PrintStream(output, true, StandardCharsets.UTF_8));
+                WAIT, clock, screen);
     }
 
     private String printed() {
@@ -266,13 +282,12 @@ class ChatGptSignInTest {
     }
 
     /**
-     * ブラウザの代わり。認可 URL を受け取ると、戻り先へ偽の戻りを送る（実際のブラウザは開かない）。
+     * ブラウザの代わり。画面に出された認可 URL を受け取ると、戻り先へ偽の戻りを送る（実際のブラウザは開かない）。
      * 次に交換で返す偽のトークン（ID トークンを含む）も、ここで用意する。
      */
-    class FakeBrowser implements ChatGptSignIn.Browser {
+    class FakeBrowser {
 
         final List<String> urls = new CopyOnWriteArrayList<>();
-        boolean opens = true;
         /** 戻りで送る client_id（null なら送らない）。 */
         String callbackClientId = CLIENT_ID;
         /** ID トークンの宛先（aud）。 */
@@ -283,8 +298,7 @@ class ChatGptSignInTest {
         String nonceToSend;
         boolean withIdToken = true;
 
-        @Override
-        public boolean open(String url) {
+        void open(String url) {
             urls.add(url);
             Map<String, String> query = queryOf(url);
             String nonce = nonceToSend != null ? nonceToSend : query.get("nonce");
@@ -302,7 +316,6 @@ class ChatGptSignInTest {
             } catch (IOException | InterruptedException e) {
                 throw new IllegalStateException(e);
             }
-            return opens;
         }
     }
 
