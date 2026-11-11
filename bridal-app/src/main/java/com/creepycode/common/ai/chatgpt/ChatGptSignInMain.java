@@ -32,7 +32,6 @@ public final class ChatGptSignInMain {
                 new ChatGptCredentialStore(ChatGptCredentialStore.defaultDirectory(), new WindowsDpapiProtector()),
                 new ChatGptOAuthClient(ChatGptEndpoints.official()),
                 new IdTokenVerifier(),
-                ChatGptSignIn::openInDefaultBrowser,
                 CALLBACK_TIMEOUT,
                 Clock.systemUTC(),
                 System.out);

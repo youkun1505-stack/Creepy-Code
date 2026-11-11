@@ -28,7 +28,7 @@ import ch.qos.logback.core.read.ListAppender;
 
 /**
  * 起動時の自動サインイン（ChatGptAutoSignIn）のテスト。
- * 保存先は @TempDir の中だけ使い、ブラウザは開かず URL を記録するだけにする。外のネットワークは使わない。
+ * 保存先は @TempDir の中だけ使い、画面に出された認可 URL を記録するだけにする（ブラウザは開かない）。外のネットワークは使わない。
  * 戻りは来ないので、短い時間で時間切れにさせる（本番の5分は使わない）。
  */
 class ChatGptAutoSignInTest {
@@ -40,7 +40,8 @@ class ChatGptAutoSignInTest {
     @TempDir
     Path tempDir;
 
-    private final List<String> browserUrls = new CopyOnWriteArrayList<>();
+    /** 画面に出された認可 URL（テストではブラウザを開かず、ここに記録するだけ）。 */
+    private final List<String> shownUrls = new CopyOnWriteArrayList<>();
     private ChatGptCredentialStore store;
     private ListAppender<ILoggingEvent> logs;
     private Logger logger;
@@ -71,7 +72,7 @@ class ChatGptAutoSignInTest {
     }
 
     @Test
-    void 未サインインのときは_ブラウザを開いて_127の戻り先でサインインを始める() throws Exception {
+    void 未サインインのときは_認可URLを画面に出して_127の戻り先でサインインを始める() throws Exception {
         int port = freePort();
         ChatGptAutoSignIn autoSignIn = new ChatGptAutoSignIn(store, signIn(SHORT_TIMEOUT), port);
 
@@ -79,8 +80,8 @@ class ChatGptAutoSignInTest {
         thread.join(WAIT.toMillis());
 
         assertThat(thread.isAlive()).isFalse();
-        assertThat(browserUrls).hasSize(1);
-        assertThat(browserUrls.get(0)).contains("127.0.0.1%3A" + port).doesNotContain("localhost");
+        assertThat(shownUrls).hasSize(1);
+        assertThat(shownUrls.get(0)).contains("127.0.0.1%3A" + port).doesNotContain("localhost");
     }
 
     @Test
@@ -93,7 +94,7 @@ class ChatGptAutoSignInTest {
         thread.join(WAIT.toMillis());
 
         assertThat(thread.isAlive()).isFalse();
-        assertThat(browserUrls).isEmpty();
+        assertThat(shownUrls).isEmpty();
         assertThat(warnMessages()).isEmpty();
     }
 
@@ -107,7 +108,7 @@ class ChatGptAutoSignInTest {
         thread.join(WAIT.toMillis());
 
         assertThat(thread.isAlive()).isFalse();
-        assertThat(browserUrls).isEmpty();
+        assertThat(shownUrls).isEmpty();
     }
 
     @Test
@@ -118,7 +119,7 @@ class ChatGptAutoSignInTest {
         thread.join(WAIT.toMillis());
 
         assertThat(thread.isAlive()).isFalse();
-        assertThat(browserUrls).hasSize(1);
+        assertThat(shownUrls).hasSize(1);
         List<String> warnings = warnMessages();
         assertThat(warnings).hasSize(1);
         assertThat(warnings.get(0))
@@ -128,7 +129,7 @@ class ChatGptAutoSignInTest {
     }
 
     @Test
-    void ポートが使用中のときは_ブラウザを開かず_案内をログに出す() throws Exception {
+    void ポートが使用中のときは_URLを出さず_案内をログに出す() throws Exception {
         int port = freePort();
         try (ServerSocket occupied = new ServerSocket(port, 1, InetAddress.getLoopbackAddress())) {
             ChatGptAutoSignIn autoSignIn = new ChatGptAutoSignIn(store, signIn(SHORT_TIMEOUT), port);
@@ -137,7 +138,7 @@ class ChatGptAutoSignInTest {
             thread.join(WAIT.toMillis());
 
             assertThat(thread.isAlive()).isFalse();
-            assertThat(browserUrls).isEmpty();
+            assertThat(shownUrls).isEmpty();
             assertThat(warnMessages()).hasSize(1);
             assertThat(warnMessages().get(0))
                     .contains("使用中")
@@ -153,7 +154,7 @@ class ChatGptAutoSignInTest {
 
         Thread thread = autoSignIn.start();
         assertThat(thread.isDaemon()).isTrue();
-        waitUntilBrowserOpened();
+        waitUntilUrlShown();
 
         autoSignIn.stop();
         thread.join(WAIT.toMillis());
@@ -167,15 +168,19 @@ class ChatGptAutoSignInTest {
         assertThat(infoMessages()).anyMatch(message -> message.contains("中断"));
     }
 
-    /** 認可 URL を開く部品（ブラウザは開かず、URL を記録するだけ）を持つサインインの操作を作る。 */
+    /** サインインの操作を作る。画面に出された認可 URL（https://）を記録するだけにする（ブラウザは開かない）。 */
     private ChatGptSignIn signIn(Duration callbackTimeout) {
-        ChatGptSignIn.Browser recordOnly = url -> {
-            browserUrls.add(url);
-            return true;
+        PrintStream recordUrls = new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8) {
+            @Override
+            public void println(String line) {
+                super.println(line);
+                if (line != null && line.startsWith("https://")) {
+                    shownUrls.add(line);
+                }
+            }
         };
         return new ChatGptSignIn(store, new ChatGptOAuthClient(ChatGptEndpoints.official()), new IdTokenVerifier(),
-                recordOnly, callbackTimeout, CLOCK,
-                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8));
+                callbackTimeout, CLOCK, recordUrls);
     }
 
     private List<String> warnMessages() {
@@ -193,13 +198,13 @@ class ChatGptAutoSignInTest {
                 .toList();
     }
 
-    /** サインインがブラウザを開く所まで進むのを待つ。 */
-    private void waitUntilBrowserOpened() throws InterruptedException {
+    /** サインインが認可 URL を画面に出す所まで進むのを待つ。 */
+    private void waitUntilUrlShown() throws InterruptedException {
         long deadline = System.currentTimeMillis() + WAIT.toMillis();
-        while (browserUrls.isEmpty() && System.currentTimeMillis() < deadline) {
+        while (shownUrls.isEmpty() && System.currentTimeMillis() < deadline) {
             Thread.sleep(20);
         }
-        assertThat(browserUrls).hasSize(1);
+        assertThat(shownUrls).hasSize(1);
     }
 
     /** 空いている番号を1つ借りて、すぐ返す（テストのポートに使う）。 */
