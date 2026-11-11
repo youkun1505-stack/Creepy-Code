@@ -55,9 +55,20 @@ class StartupPortLoggerTest {
         assertThat(logs).hasSize(1);
         assertThat(logs.get(0).getLevel().toString()).isEqualTo("INFO");
         assertThat(logs.get(0).getFormattedMessage())
-                .contains("ポート番号: 8080")
+                .contains("port 8080")
                 .contains("http://localhost:8080")
                 .doesNotContain("http://localhost:8080/");
+    }
+
+    @Test
+    void ログの文に日本語を含まず_英語と記号だけで出す() {
+        new StartupPortLogger("/bridal").onApplicationEvent(eventWithPort(8081));
+
+        String message = appender.list.get(0).getFormattedMessage();
+        assertThat(message)
+                .isEqualTo("bridal-app is ready on port 8081: http://localhost:8081/bridal");
+        // 半角の英数字と記号（ASCII の表示できる文字と空白）だけであることを確かめる
+        assertThat(message).matches("[\\x20-\\x7E]+");
     }
 
     @Test
@@ -66,7 +77,7 @@ class StartupPortLoggerTest {
         new StartupPortLogger("").onApplicationEvent(eventWithPort(54321));
 
         assertThat(appender.list.get(0).getFormattedMessage())
-                .contains("ポート番号: 54321")
+                .contains("port 54321")
                 .contains("http://localhost:54321")
                 .doesNotContain("8080");
     }

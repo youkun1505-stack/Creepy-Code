@@ -34,8 +34,8 @@ public class StartupPortLogger implements ApplicationListener<WebServerInitializ
 
     /** ログに出す1行の文章を作る。ポート番号と、ブラウザで開く URL を含む。 */
     String buildMessage(int port) {
-        return "bridal-app の起動が完了しました。ポート番号: " + port
-                + "／ブラウザで開く URL: http://localhost:" + port + contextPath;
+        return "bridal-app is ready on port " + port
+                + ": http://localhost:" + port + contextPath;
     }
 
     /** context-path の前後の / をそろえる。空や「/」のときは空文字（ルートで開く）にする。 */
