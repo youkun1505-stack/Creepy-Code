@@ -117,6 +117,90 @@ class AiChatServiceTest {
     }
 
     @Test
+    void 件数が上限以下の履歴は_すべてAIに渡り_今回の発言が最後に来る() {
+        java.util.ArrayList<AiChatMessage> history = new java.util.ArrayList<>();
+        for (int i = 0; i < 20; i++) {
+            history.add(message(AiChatMessage.ROLE_USER, "発言" + i));
+        }
+        givenHistory(history);
+        List<ChatTurn> sent = captureTurns();
+
+        service.sendMessage(USER_ID, "今回の質問");
+
+        assertThat(sent).hasSize(21);
+        assertThat(sent.get(0).content()).isEqualTo("発言0");
+        assertThat(sent.get(19).content()).isEqualTo("発言19");
+        assertThat(sent.get(20)).isEqualTo(new ChatTurn(AiChatMessage.ROLE_USER, "今回の質問"));
+    }
+
+    @Test
+    void 件数が上限を超えると_古い発言から除かれ_新しい20件だけがAIに渡る() {
+        java.util.ArrayList<AiChatMessage> history = new java.util.ArrayList<>();
+        for (int i = 0; i < 25; i++) {
+            history.add(message(AiChatMessage.ROLE_USER, "発言" + i));
+        }
+        givenHistory(history);
+        List<ChatTurn> sent = captureTurns();
+
+        service.sendMessage(USER_ID, "今回の質問");
+
+        // 発言0〜4（古い5件）は除かれ、発言5〜24（新しい20件）が古い順のまま渡る
+        assertThat(sent).hasSize(21);
+        assertThat(sent.get(0).content()).isEqualTo("発言5");
+        assertThat(sent.get(19).content()).isEqualTo("発言24");
+        assertThat(sent.get(20)).isEqualTo(new ChatTurn(AiChatMessage.ROLE_USER, "今回の質問"));
+    }
+
+    @Test
+    void 字数が上限を超えると_古い発言から除かれ_新しい発言だけがAIに渡る() {
+        givenHistory(List.of(
+                message(AiChatMessage.ROLE_USER, "あ".repeat(3000)),
+                message(AiChatMessage.ROLE_AI, "い".repeat(3000)),
+                message(AiChatMessage.ROLE_USER, "う".repeat(3000))));
+        List<ChatTurn> sent = captureTurns();
+
+        service.sendMessage(USER_ID, "今回の質問");
+
+        // 3件の合計は9000字で上限8000字を超えるので、一番古い「あ」の発言だけ除く
+        assertThat(sent).containsExactly(new ChatTurn(AiChatMessage.ROLE_AI, "い".repeat(3000)),
+                new ChatTurn(AiChatMessage.ROLE_USER, "う".repeat(3000)),
+                new ChatTurn(AiChatMessage.ROLE_USER, "今回の質問"));
+    }
+
+    @Test
+    void 一件だけで字数の上限を超える古い発言は_途中で切らず_それより古い発言も含めて除く() {
+        givenHistory(List.of(
+                message(AiChatMessage.ROLE_USER, "古い発言"),
+                message(AiChatMessage.ROLE_AI, "か".repeat(8001)),
+                message(AiChatMessage.ROLE_USER, "新しい発言")));
+        List<ChatTurn> sent = captureTurns();
+
+        service.sendMessage(USER_ID, "今回の質問");
+
+        assertThat(sent).containsExactly(new ChatTurn(AiChatMessage.ROLE_USER, "新しい発言"),
+                new ChatTurn(AiChatMessage.ROLE_USER, "今回の質問"));
+    }
+
+    @Test
+    void 字数はコードポイントで数え_8000字ちょうどは渡り_8001字は除かれる() {
+        // 「𠮷」は1字（コードポイント）だが、文字の並びとしては2つぶんの長さ
+        givenHistory(List.of(message(AiChatMessage.ROLE_USER, "𠮷".repeat(8000))));
+        List<ChatTurn> sent = captureTurns();
+
+        service.sendMessage(USER_ID, "今回の質問");
+
+        assertThat(sent).hasSize(2);
+        assertThat(sent.get(0).content()).isEqualTo("𠮷".repeat(8000));
+
+        givenHistory(List.of(message(AiChatMessage.ROLE_USER, "𠮷".repeat(8001))));
+        List<ChatTurn> sentAgain = captureTurns();
+
+        service.sendMessage(USER_ID, "今回の質問");
+
+        assertThat(sentAgain).containsExactly(new ChatTurn(AiChatMessage.ROLE_USER, "今回の質問"));
+    }
+
+    @Test
     void AIの呼び出しに失敗したら_発言も返事も保存せず_例外を呼び出し元に伝える() {
         when(aiClient.generateReply(anyString(), anyList())).thenThrow(new AiException("AI の呼び出しに失敗しました"));
 
@@ -178,6 +262,11 @@ class AiChatServiceTest {
         message.setContent(content);
         message.setCreatedAt(LocalDateTime.now());
         return message;
+    }
+
+    /** その利用者のそれまでの発言として、リポジトリが返す履歴を決める。 */
+    private void givenHistory(List<AiChatMessage> history) {
+        when(chatRepository.findByUserIdOrderByCreatedAtAscMessageIdAsc(USER_ID)).thenReturn(history);
     }
 
     /** AI に渡された履歴を、呼び出しのたびに記録する（返事は固定）。 */
