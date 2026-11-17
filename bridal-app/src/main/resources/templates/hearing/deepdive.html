@@ -9,6 +9,7 @@
         <h1 class="page-title">AIに相談する</h1>
         <p class="page-lead">結婚式のことで気になることを、ふつうの言葉で書いて送ってください。</p>
 
+        <div class="deepdive-layout">
         <section class="deepdive-chat" aria-label="AIとの相談">
             <!-- 履歴が無いときだけ出す、相談のしかたの案内 -->
             <div class="deepdive-chat__guide" id="chatGuide" th:if="${#lists.isEmpty(chatMessages)}">
@@ -58,6 +59,20 @@
                 </div>
             </form>
         </section>
+
+            <!-- かんたん質問の答え（読むだけ。入力欄・送信ボタンは持たない）。広い画面ではチャットの横、狭い画面では下に並ぶ -->
+            <aside class="deepdive-answers" aria-labelledby="answersTitle">
+                <h2 class="deepdive-answers__title" id="answersTitle">かんたん質問の答え</h2>
+                <p class="deepdive-answers__note">これまでに答えた内容です。ここでは変更できません。</p>
+                <p class="deepdive-answers__empty" th:if="${#lists.isEmpty(answerItems)}">まだ答えていません</p>
+                <dl class="deepdive-answers__list" th:unless="${#lists.isEmpty(answerItems)}">
+                    <div class="deepdive-answers__item" th:each="item : ${answerItems}">
+                        <dt class="deepdive-answers__label" th:text="${item.label}">理想のカップル像</dt>
+                        <dd class="deepdive-answers__value" th:text="${item.value}">値</dd>
+                    </div>
+                </dl>
+            </aside>
+        </div>
     </main>
 
     <th:block layout:fragment="scripts">

@@ -343,4 +343,54 @@ h3 {
     }
 }
 
+/* AIに相談する（P-10）：チャットの横に「かんたん質問の答え」を出す（狭い画面では下に並ぶ） */
+.deepdive-layout {
+    display: grid;
+    gap: 1.5rem;
+}
+
+@media (min-width: 992px) {
+    .deepdive-layout {
+        grid-template-columns: minmax(0, 1fr) 18rem;
+        align-items: start;
+    }
+}
+
+.deepdive-answers {
+    padding: 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.5rem;
+    background-color: var(--color-background-sub);
+}
+
+.deepdive-answers__title {
+    margin-bottom: 0.25rem;
+    font-size: 1.1rem;
+    font-weight: bold;
+}
+
+.deepdive-answers__note {
+    margin-bottom: 0.75rem;
+    color: var(--color-text-sub);
+    font-size: 0.875rem;
+}
+
+.deepdive-answers__empty {
+    color: var(--color-text-sub);
+}
+
+.deepdive-answers__item {
+    margin-bottom: 0.75rem;
+}
+
+.deepdive-answers__label {
+    color: var(--color-text-sub);
+    font-size: 0.875rem;
+}
+
+.deepdive-answers__value {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
 

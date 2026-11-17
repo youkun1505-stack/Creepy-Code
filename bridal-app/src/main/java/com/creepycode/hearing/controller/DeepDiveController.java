@@ -47,6 +47,7 @@ public class DeepDiveController {
 
     /**
      * 画面を表示する。ログイン中の顧客の、それまでの相談の履歴を古い順に渡す（chatMessages）。
+     * かんたん質問の答えの欄の項目も渡す（answerItems。答えが無ければ空）。欄は読むだけ。
      */
     @GetMapping
     public String show(@AuthenticationPrincipal LoginUser loginUser, Model model) {
@@ -54,6 +55,7 @@ public class DeepDiveController {
                 .map(message -> new AiChatMessageView(message.getRole(), message.getContent(), message.getCreatedAt()))
                 .toList();
         model.addAttribute("chatMessages", chatMessages);
+        model.addAttribute("answerItems", aiChatService.findAnswerItems(loginUser.getUserId()));
         model.addAttribute("maxChatLength", AiChatService.MAX_LENGTH);
         return VIEW;
     }
