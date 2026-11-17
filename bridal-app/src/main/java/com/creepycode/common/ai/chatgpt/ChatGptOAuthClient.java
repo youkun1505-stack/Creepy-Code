@@ -155,11 +155,11 @@ public class ChatGptOAuthClient {
     }
 
     /**
-     * 戻りの値を確かめ、code をトークンに交換して資格情報を作る。
+     * 戻りの値を確かめ、登録情報（hostId・client_id）を返す。交換はしない（資格情報も保存もしない）。
      * 確かめに通らないとき（取り消し・state が違う・初回で ID が無い・登録済みと違う ID が戻った・code が無い）は、
-     * 交換せずに例外にする。保存はしない（呼び出し側が行う）。
+     * 例外にする。初回で確かめに通ったときは、呼び出し側が交換の前に登録情報を保存する（ChatGptSignIn）。
      */
-    public ChatGptSignInResult completeSignIn(ChatGptAuthAttempt attempt, ChatGptCallback callback) {
+    public ChatGptRegistration checkCallback(ChatGptAuthAttempt attempt, ChatGptCallback callback) {
         if (callback.error() != null) {
             if ("access_denied".equals(callback.error())) {
                 throw new ChatGptSignInException("サインインがキャンセルされました。もう一度お試しください。");
@@ -189,8 +189,26 @@ public class ChatGptOAuthClient {
             clientId = attempt.registeredClientId();
         }
 
-        ChatGptCredentials credentials = exchangeCode(attempt, callback.code(), clientId);
-        return new ChatGptSignInResult(credentials, new ChatGptRegistration(attempt.hostId(), clientId));
+        return new ChatGptRegistration(attempt.hostId(), clientId);
+    }
+
+    /**
+     * 戻りの値を確かめ、code をトークンに交換して資格情報を作る（checkCallback と exchangeChecked の組み合わせ）。
+     * 確かめに通らないときは、交換せずに例外にする。保存はしない（呼び出し側が行う）。
+     */
+    public ChatGptSignInResult completeSignIn(ChatGptAuthAttempt attempt, ChatGptCallback callback) {
+        ChatGptRegistration registration = checkCallback(attempt, callback);
+        return exchangeChecked(attempt, callback.code(), registration);
+    }
+
+    /**
+     * checkCallback で確かめに通った登録情報を使って、code をトークンに交換する。資格情報は返すだけで保存しない。
+     * ここで失敗しても登録情報は呼び出し側で残す（次のサインインで同じ client_id を使うため）。
+     */
+    public ChatGptSignInResult exchangeChecked(ChatGptAuthAttempt attempt, String code,
+            ChatGptRegistration registration) {
+        ChatGptCredentials credentials = exchangeCode(attempt, code, registration.clientId());
+        return new ChatGptSignInResult(credentials, registration);
     }
 
     private ChatGptCredentials exchangeCode(ChatGptAuthAttempt attempt, String code, String clientId) {

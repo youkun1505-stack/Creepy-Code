@@ -1,6 +1,7 @@
 package com.creepycode.common.ai.chatgpt;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -12,6 +13,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
@@ -217,6 +219,72 @@ class ChatGptCredentialStoreTest {
 
         assertThat(failures).isEmpty();
         assertThat(store.load()).isEqualTo(Optional.of(last));
+    }
+
+    @Test
+    void ホストの値は無ければ作って保存し_次からは同じ値を返し_作り直さない() {
+        ChatGptCredentialStore store = new ChatGptCredentialStore(tempDir.resolve("chatgpt-java"),
+                new FakeProtector(false));
+        AtomicInteger created = new AtomicInteger();
+        assertThat(store.loadHostId()).isEmpty();
+
+        String first = store.loadOrCreateHostId(() -> "host-" + created.incrementAndGet());
+        String second = store.loadOrCreateHostId(() -> "host-" + created.incrementAndGet());
+
+        assertThat(first).isEqualTo("host-1");
+        assertThat(second).isEqualTo("host-1");
+        assertThat(created.get()).isEqualTo(1);
+        assertThat(store.loadHostId()).isEqualTo(Optional.of("host-1"));
+    }
+
+    @Test
+    void host_jsonが壊れている_または値が空なら_例外で止まり_新しい値を作らずファイルも変えない() throws IOException {
+        Path directory = tempDir.resolve("chatgpt-java");
+        Files.createDirectories(directory);
+        Path hostFile = directory.resolve("host.json");
+        ChatGptCredentialStore store = new ChatGptCredentialStore(directory, new FakeProtector(false));
+        for (String broken : List.of("壊れた中身", "{\"hostId\":\"\"}", "{}", "null")) {
+            Files.writeString(hostFile, broken);
+            AtomicInteger created = new AtomicInteger();
+
+            assertThatThrownBy(() -> store.loadOrCreateHostId(() -> {
+                created.incrementAndGet();
+                return "new-host";
+            })).as(broken).isInstanceOf(ChatGptSignInException.class).hasMessageContaining("host.json");
+            assertThat(created.get()).as(broken).isZero();
+            assertThat(Files.readString(hostFile)).as(broken).isEqualTo(broken);
+        }
+    }
+
+    @Test
+    void 確かめつきの登録情報の読み方は_無ければ空_壊れていれば例外になり_通常の読み方は空のまま() throws IOException {
+        Path directory = tempDir.resolve("chatgpt-java");
+        ChatGptCredentialStore store = new ChatGptCredentialStore(directory, new FakeProtector(false));
+        assertThat(store.loadRegistrationChecked()).isEmpty();
+
+        Files.createDirectories(directory);
+        // 読めない形：確かめつきの読み方は例外。通常の読み方（トークン更新用）は今までどおり空
+        for (String broken : List.of("壊れた", "{\"hostId\":\"h\"}")) {
+            Files.writeString(directory.resolve("registration.json"), broken);
+
+            assertThatThrownBy(() -> store.loadRegistrationChecked()).as(broken)
+                    .isInstanceOf(ChatGptSignInException.class).hasMessageContaining("registration.json");
+            assertThat(store.loadRegistration()).as(broken).isEmpty();
+        }
+        // 読めるが値が空：確かめつきの読み方は例外（通常の読み方の動きは変えない）
+        Files.writeString(directory.resolve("registration.json"), "{\"hostId\":\"\",\"clientId\":\"c\"}");
+        assertThatThrownBy(() -> store.loadRegistrationChecked())
+                .isInstanceOf(ChatGptSignInException.class).hasMessageContaining("registration.json");
+    }
+
+    @Test
+    void 確かめつきの登録情報の読み方は_正しければ読める() {
+        ChatGptCredentialStore store = new ChatGptCredentialStore(tempDir.resolve("chatgpt-java"),
+                new FakeProtector(false));
+        ChatGptRegistration registration = new ChatGptRegistration("host-ok", "client-ok");
+        store.saveRegistration(registration);
+
+        assertThat(store.loadRegistrationChecked()).isEqualTo(Optional.of(registration));
     }
 
     /** テスト用の偽の暗号化。平文をそのまま見えないように XOR する（DPAPI の代わり）。 */

@@ -14,16 +14,19 @@ import java.time.format.DateTimeParseException;
 import java.util.Base64;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * Sign in with ChatGPT の資格情報と登録情報を、リポジトリの外のフォルダに保存・読み込み・削除する。
  * 資格情報は CredentialProtector で暗号化してから書く（ファイルに平文のトークンを残さない）。
  * 登録情報（hostId・clientId）は秘密ではないので、暗号化せず別ファイルに書く。
+ * 登録情報が無いときのホストの値（hostId）は host.json に、初回のサインイン用 URL を出す前に保存する。
  * 書くときは一時ファイルに書いてから置き換える（途中で止まっても、壊れたファイルを残さないため）。
  */
 public class ChatGptCredentialStore {
@@ -34,6 +37,11 @@ public class ChatGptCredentialStore {
     private static final String STORE_FOLDER_NAME = "chatgpt-java";
     private static final String CREDENTIALS_FILE_NAME = "credentials.dat";
     private static final String REGISTRATION_FILE_NAME = "registration.json";
+    private static final String HOST_FILE_NAME = "host.json";
+    private static final String HOST_BROKEN_MESSAGE =
+            "ホストの記録（host.json）を読めませんでした。新しい記録は作らずに止めました。保存先のフォルダの host.json の場所と中身を確かめてください（中身は表示しません）。";
+    private static final String REGISTRATION_BROKEN_MESSAGE =
+            "登録情報（registration.json）を読めませんでした。別の登録をせずに止めました。保存先のフォルダの registration.json の場所と中身を確かめてください（中身は表示しません）。";
     /** 置き換えの試行回数と、失敗のあとの待ち時間（別の読み手が閉じるのを待つ）。 */
     private static final int REPLACE_ATTEMPTS = 20;
     private static final Duration REPLACE_RETRY_WAIT = Duration.ofMillis(50);
@@ -143,12 +151,95 @@ public class ChatGptCredentialStore {
         }
     }
 
+    /**
+     * サインインで使う登録情報を読む。無いときは空を返す（初回）。ファイルはあるのに読めない・値が空のときは、
+     * 黙って初回扱いにせず ChatGptSignInException にする（別の登録をして、ChatGPT 側にエージェントが増えないため）。
+     * トークンの更新の部品は loadRegistration（壊れたら空）を使い、この動きは変えない。
+     */
+    public synchronized Optional<ChatGptRegistration> loadRegistrationChecked() {
+        Path file = registrationFile();
+        if (!Files.exists(file)) {
+            return Optional.empty();
+        }
+        ChatGptRegistration registration;
+        try {
+            registration = objectMapper.readValue(Files.readAllBytes(file), ChatGptRegistration.class);
+        } catch (IOException | RuntimeException e) {
+            log.warn("保存された登録情報を読めませんでした（{}）", e.getClass().getSimpleName());
+            registration = null;
+        }
+        if (registration == null || isBlank(registration.hostId()) || isBlank(registration.clientId())) {
+            throw new ChatGptSignInException(REGISTRATION_BROKEN_MESSAGE);
+        }
+        return Optional.of(registration);
+    }
+
+    /**
+     * ホストの値（ext_agent_host_id）を、別ファイル（host.json）から読む。無ければ空を返す。
+     * ファイルはあるのに読めない・値が空のときは、作り直さずに ChatGptSignInException にする（中身は出さない）。
+     */
+    public synchronized Optional<String> loadHostId() {
+        Path file = hostFile();
+        if (!Files.exists(file)) {
+            return Optional.empty();
+        }
+        String hostId;
+        try {
+            hostId = hostIdOf(objectMapper.readTree(Files.readString(file, StandardCharsets.UTF_8)));
+        } catch (IOException | RuntimeException e) {
+            log.warn("ホストの記録（host.json）を読めませんでした（{}）", e.getClass().getSimpleName());
+            hostId = null;
+        }
+        if (hostId == null) {
+            throw new ChatGptSignInException(HOST_BROKEN_MESSAGE);
+        }
+        return Optional.of(hostId);
+    }
+
+    /** ホストの値（ext_agent_host_id）を host.json に保存する。秘密ではないので暗号化しない。 */
+    public synchronized void saveHostId(String hostId) {
+        writeAtomically(hostFile(), toJson(new StoredHostId(hostId)));
+    }
+
+    /**
+     * 保存済みのホストの値を返す。無いときだけ newHostId で作って保存してから返す。
+     * サインイン用の URL を出す前に呼ぶ（やり直しでも同じ値を使い、ChatGPT 側にエージェントが増えないため）。
+     */
+    public synchronized String loadOrCreateHostId(Supplier<String> newHostId) {
+        Optional<String> saved = loadHostId();
+        if (saved.isPresent()) {
+            return saved.get();
+        }
+        String created = newHostId.get();
+        saveHostId(created);
+        return created;
+    }
+
+    private static String hostIdOf(JsonNode json) {
+        if (json == null || !json.isObject()) {
+            return null;
+        }
+        JsonNode node = json.get("hostId");
+        if (node == null || !node.isTextual() || isBlank(node.asText())) {
+            return null;
+        }
+        return node.asText();
+    }
+
+    private static boolean isBlank(String text) {
+        return text == null || text.isBlank();
+    }
+
     private Path credentialsFile() {
         return directory.resolve(CREDENTIALS_FILE_NAME);
     }
 
     private Path registrationFile() {
         return directory.resolve(REGISTRATION_FILE_NAME);
+    }
+
+    private Path hostFile() {
+        return directory.resolve(HOST_FILE_NAME);
     }
 
     private byte[] toJson(Object value) {
@@ -232,5 +323,9 @@ public class ChatGptCredentialStore {
      */
     static record StoredCredentials(String accessToken, String refreshToken, String idToken, String expiresAt,
             String scope, String earliestRefreshAt) {
+    }
+
+    /** ホストの値のファイル（host.json）の中身。{"hostId":"..."} の形。 */
+    static record StoredHostId(String hostId) {
     }
 }
