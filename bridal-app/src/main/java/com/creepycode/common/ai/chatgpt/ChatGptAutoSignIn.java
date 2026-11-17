@@ -28,6 +28,12 @@ public class ChatGptAutoSignIn {
     private volatile Thread worker;
 
     /**
+     * stop() で止めたかどうか。中断の印（isInterrupted）は、受け口を閉じる処理などで消えることがあるため、
+     * 止めたことはこの目印で覚える。stop() の中で、中断より前に立てる。
+     */
+    private volatile boolean stopRequested;
+
+    /**
      * 戻り先は ChatGptSignInMain と同じ初期ポート（1455）。
      *
      * @param store  保存されたサインイン情報を見るための保存先
@@ -61,6 +67,7 @@ public class ChatGptAutoSignIn {
     Thread start() {
         Thread thread = new Thread(this::signInIfNeeded, THREAD_NAME);
         thread.setDaemon(true);
+        stopRequested = false;
         worker = thread;
         thread.start();
         return thread;
@@ -69,6 +76,7 @@ public class ChatGptAutoSignIn {
     /** アプリを止めるときに、動いているサインインを中断する（待ち受けの受け口も閉じられる）。 */
     @PreDestroy
     public void stop() {
+        stopRequested = true;
         Thread thread = worker;
         if (thread != null && thread.isAlive()) {
             thread.interrupt();
@@ -86,8 +94,9 @@ public class ChatGptAutoSignIn {
             signIn.signIn(port);
             log.info("ChatGPT の自動サインインが終わりました。");
         } catch (RuntimeException e) {
-            // 中断されたのは、アプリを止めたため。失敗ではないので、案内は出さない
-            if (Thread.currentThread().isInterrupted()) {
+            // 止めたため（stop() を呼んだ、または中断の印が残っている）なら、失敗ではないので案内は出さない。
+            // 中断の印だけでは判断しない。受け口を閉じる処理などで印が消えても、止めたことは stopRequested で分かる
+            if (stopRequested || Thread.currentThread().isInterrupted()) {
                 log.info("アプリを止めるため、自動サインインを中断しました。");
                 return;
             }
