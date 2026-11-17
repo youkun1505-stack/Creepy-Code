@@ -153,7 +153,10 @@ Codex はこのファイルを直接読みます。Claude Code は `.claude/CLAU
   `feature/〇〇`（新しい機能）・`fix/〇〇`（不具合の修正）・`docs/〇〇`（資料だけの変更）。
   issue があれば番号を先頭に付ける（例：`feature/12-plan-view`）。
   `release/*`・`hotfix/*` は人が作る。
-- **`main` と `develop` へは直接送信しない。** 取り込みは必ず `develop` 向けの PR で、取り込むのは人。
+- **`main` と `develop` へは直接送信しない。** 取り込みは必ず PR で行う。
+  - `develop` 向けの PR は、GitHub の CI（チェック名 `bridal-app-test`：`bridal-app` のテスト）が通ったら自動で取り込む。
+    PR を作ったら、`gh pr merge <番号> --auto --merge` で自動取り込みを予約する（`.github/workflows/bridal-app-test.yml`）。
+  - `main` 向けの PR は、ほかのメンバー1人の承認が必要で、取り込むのは人。
 - 送信（push）と PR 作成は、内容を見せてメンバーの「はい」をもらってから、自分の作業ブランチだけ行う。
 - 最新の `develop` を自分の作業ブランチに取り込む（`merge`）ことだけは、次の条件を守れば行ってよい。
   PR が `develop` と衝突したときや、`develop` の新しい変更が必要なときに使う。
@@ -164,7 +167,7 @@ Codex はこのファイルを直接読みます。Claude Code は `.claude/CLAU
     やめるときは `git merge --abort` で取り込む前に戻す。
   - 解消したら、`bridal-app` に変更があればテスト（`mvnw.cmd -q test`）を実行し、結果を報告してから送信する。
 - 禁止：強制送信（`--force`）、上の条件に合わない取り込み（`merge`）、付け替え（`rebase`）、`reset --hard`、`clean`、
-  ブランチ削除、`git config` の変更、`--no-verify`、PR の取り込み（`gh pr merge`）。
+  ブランチ削除、`git config` の変更、`--no-verify`、自動取り込みの予約（`gh pr merge --auto`）のほかの PR の取り込み、保護を飛ばす取り込み（`gh pr merge --admin`）、取り込みと同時のブランチ削除。
 - コミットメッセージは `feat:`・`fix:`・`docs:`・`style:`・`refactor:`・`test:`・`chore:` で始め、日本語で書く。
   AI が関わったコミットは、最後の行に `Co-authored-by: Claude <noreply@anthropic.com>` を付ける（Codex なら Codex の名前）。
 - コミットの作者はメンバー本人のまま（Git の名前を変えない）。
@@ -187,7 +190,7 @@ Codex はこのファイルを直接読みます。Claude Code は `.claude/CLAU
 - テストと、その期待値・判定基準（テストを消す・`@Disabled` で飛ばす・期待値を実装に合わせて緩める、をしない）
 - ログイン・権限の確認など、利用者を守る仕組み
 - フック（`.githooks/`・`.claude/settings.json` の `hooks`）と、許可の設定（`permissions`・`.codex/rules/`）
-- GitHub のブランチの保護（`main`・`develop` への直接の送信禁止、PR 必須）
+- GitHub のブランチの保護（`main`・`develop` への直接の送信禁止、PR 必須、CI `bridal-app-test` の合格が必須、`main` はほかのメンバー1人の承認が必須、管理者にも同じ決まりを適用）と、CI（`.github/workflows/`）
 
 ## 7. 引き継ぎ
 
