@@ -223,6 +223,15 @@ h3 {
     white-space: pre-wrap;
 }
 
+/* 返事は出せたが保存できなかったときの案内（吹き出しの下に添える） */
+.deepdive-message__notice {
+    margin: 0.5rem 0 0;
+    padding-top: 0.5rem;
+    border-top: 1px dashed var(--color-border);
+    color: var(--color-text-sub);
+    font-size: var(--font-size-small);
+}
+
 .deepdive-chat__pending {
     margin: 0.5rem 0;
     color: var(--color-text-sub);
@@ -341,6 +350,68 @@ h3 {
         width: 100%;
         padding: 0.75rem 1.5rem;
     }
+}
+
+/* AIに相談する（P-10）：チャットの横に「かんたん質問の答え」を出す（狭い画面では下に並ぶ） */
+.deepdive-layout {
+    display: grid;
+    gap: 1.5rem;
+}
+
+/* 2列になる幅では、AIに相談する画面だけ本文の幅を広げ、チャットの幅を変更前に近く保つ（ほかの画面の .site-main は変えない） */
+@media (min-width: 992px) {
+    .deepdive-page {
+        max-width: 1080px;
+    }
+
+    .deepdive-layout {
+        grid-template-columns: minmax(0, 1fr) 16rem;
+        column-gap: 1.25rem;
+        align-items: start;
+    }
+}
+
+.deepdive-answers {
+    padding: 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.5rem;
+    background-color: var(--color-background-sub);
+}
+
+.deepdive-answers__title {
+    margin-bottom: 0.25rem;
+    font-size: 1.1rem;
+    font-weight: bold;
+}
+
+.deepdive-answers__note {
+    margin-bottom: 0.75rem;
+    color: var(--color-text-sub);
+    font-size: 0.875rem;
+}
+
+.deepdive-answers__empty {
+    color: var(--color-text-sub);
+}
+
+.deepdive-answers__item {
+    margin-bottom: 0.75rem;
+}
+
+.deepdive-answers__label {
+    color: var(--color-text-sub);
+    font-size: 0.875rem;
+}
+
+.deepdive-answers__value {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+/* 好きな雰囲気のテイストごとの細かい好み（1件ずつ別の行） */
+.deepdive-answers__details {
+    margin: 0.25rem 0 0;
+    padding-left: 1.25rem;
 }
 
 

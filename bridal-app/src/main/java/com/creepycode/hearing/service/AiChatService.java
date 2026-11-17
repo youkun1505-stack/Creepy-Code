@@ -5,12 +5,20 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.TransactionException;
 
 import com.creepycode.common.ai.AiClient;
 import com.creepycode.common.ai.ChatTurn;
 import com.creepycode.common.exception.AiException;
+import com.creepycode.hearing.dto.HearingAnswerItemView;
+import com.creepycode.hearing.dto.VisualSummaryView;
+import com.creepycode.hearing.dto.VisualSummaryView.TasteResult;
 import com.creepycode.hearing.entity.AiChatMessage;
 import com.creepycode.hearing.entity.ArchetypeMaster;
 import com.creepycode.hearing.entity.OnboardingAnswer;
@@ -24,6 +32,8 @@ import com.creepycode.hearing.repository.OnboardingAnswerRepository;
  */
 @Service
 public class AiChatService {
+
+    private static final Logger log = LoggerFactory.getLogger(AiChatService.class);
 
     /** 発言の長さの上限（字）。画面の入力欄も同じ上限にする。 */
     public static final int MAX_LENGTH = 1000;
@@ -47,13 +57,31 @@ public class AiChatService {
     private final AiChatMessageRepository chatRepository;
     private final OnboardingAnswerRepository answerRepository;
     private final ArchetypeMasterRepository archetypeRepository;
+    private final HearingVisualService visualService;
 
     public AiChatService(AiClient aiClient, AiChatMessageRepository chatRepository,
-            OnboardingAnswerRepository answerRepository, ArchetypeMasterRepository archetypeRepository) {
+            OnboardingAnswerRepository answerRepository, ArchetypeMasterRepository archetypeRepository,
+            HearingVisualService visualService) {
         this.aiClient = aiClient;
         this.chatRepository = chatRepository;
         this.answerRepository = answerRepository;
         this.archetypeRepository = archetypeRepository;
+        this.visualService = visualService;
+    }
+
+    /**
+     * 画面の「かんたん質問の答え」欄に出す項目を、表示の順（STEP1・STEP2・STEP3・STEP4）で返す。
+     * 回答の行が無いときは空のリストを返す（欄に「まだ答えていません」を出す）。
+     * STEP1・STEP3・STEP4 の値は AI に渡す文と同じ作り方にする。STEP2 の好きな雰囲気は、画面にだけ出す（AI には渡さない）。
+     */
+    public List<HearingAnswerItemView> findAnswerItems(Long userId) {
+        return answerRepository.findFirstByUserIdOrderByCreatedAtDesc(userId)
+                .map(answer -> {
+                    List<HearingAnswerItemView> hearing = hearingItems(answer);
+                    return List.of(hearing.get(0), styleItem(userId), hearing.get(1), hearing.get(2),
+                            hearing.get(3), hearing.get(4));
+                })
+                .orElse(List.of());
     }
 
     /** その利用者の相談の発言を、古い順に返す。まだ無いときは空のリストを返す。 */
@@ -62,13 +90,16 @@ public class AiChatService {
     }
 
     /**
-     * 利用者の発言を受けて、AI の返事を作って保存し、返事を返す。
+     * 利用者の発言を受けて、AI の返事を作って保存し、返事と保存できたかを返す。
      * AI の呼び出しに失敗したときは、発言も返事も保存せず AiException を投げる。
      * 空の発言・1000字を超える発言は IllegalArgumentException を投げる（AI は呼ばない）。
+     * 履歴や回答の読み出しが DB の失敗になったときは、AI を呼ばずに DataAccessException をそのまま投げる。
+     * AI の返事のあとの保存が DB の失敗になったときは、例外を投げず、返事を返して saved を false にする
+     * （画面は返事を出し、保存できなかった旨を添える）。
      * AI を待つあいだ DB 接続を握らないよう、このメソッド全体はトランザクションで包まない。
      * 保存は最後の saveAll の1回だけで、その中で2件がまとめて保存される（両方か、どちらも無しか）。
      */
-    public String sendMessage(Long userId, String rawContent) {
+    public ChatReply sendMessage(Long userId, String rawContent) {
         String content = validate(rawContent);
 
         // 今までのやり取りのうち、件数と字数の上限に収まる新しいほうの分だけを渡し、今回の発言を最後に足す
@@ -87,10 +118,18 @@ public class AiChatService {
 
         // 利用者の発言を先に、AI の返事をあとに並べて、1回の saveAll でまとめて保存する（古い順に並ぶように）
         LocalDateTime now = LocalDateTime.now();
-        chatRepository.saveAll(List.of(
-                newMessage(userId, AiChatMessage.ROLE_USER, content, now),
-                newMessage(userId, AiChatMessage.ROLE_AI, replyText, now)));
-        return replyText;
+        try {
+            chatRepository.saveAll(List.of(
+                    newMessage(userId, AiChatMessage.ROLE_USER, content, now),
+                    newMessage(userId, AiChatMessage.ROLE_AI, replyText, now)));
+        } catch (DataAccessException | TransactionException e) {
+            // DB に接続できない・commit に失敗すると TransactionException（Spring のトランザクションの例外）になる。
+            // 返事は作れているので捨てず、保存できなかったことだけを呼び出し元に伝える。原因は最後の引数でスタックトレースに残す
+            log.warn("AI相談の発言と返事を保存できませんでした（返事は画面に出します）：{}：{}",
+                    e.getClass().getName(), e.getMessage(), e);
+            return new ChatReply(replyText, false);
+        }
+        return new ChatReply(replyText, true);
     }
 
     /** 発言を整える（前後の空白を消す）。空・1000字超のときは IllegalArgumentException を投げる。 */
@@ -140,8 +179,21 @@ public class AiChatService {
 
     /**
      * 事前ヒアリングの回答を、AI に渡す文章にする。
+     * 項目の並びと書き方は、画面の欄と同じ hearingItems で決める。
      */
     private String describeAnswer(OnboardingAnswer answer) {
+        StringBuilder text = new StringBuilder("【事前ヒアリングの回答】\n");
+        for (HearingAnswerItemView item : hearingItems(answer)) {
+            text.append("・").append(item.label()).append("：").append(item.value()).append("\n");
+        }
+        return text.toString();
+    }
+
+    /**
+     * 事前ヒアリングのうち、STEP1・STEP3・STEP4 の項目を、この順で作る。
+     * AI に渡す文と画面の欄の両方が、この作り方を使う（値が食い違わないようにするため）。
+     */
+    private List<HearingAnswerItemView> hearingItems(OnboardingAnswer answer) {
         String archetype = answer.getArchetypeId() == null ? "まだイメージできない"
                 : archetypeRepository.findById(answer.getArchetypeId())
                         .map(master -> master.getName() + "（" + master.getDescription() + "）")
@@ -149,15 +201,32 @@ public class AiChatService {
         String desiredDate = answer.getDesiredDate() == null ? "まだ決まっていない" : answer.getDesiredDate().toString();
         String budget = answer.getBudget() == null ? "まだ決まっていない"
                 : NumberFormat.getNumberInstance(Locale.JAPAN).format(answer.getBudget()) + "円";
-        return """
-                【事前ヒアリングの回答】
-                ・理想のカップル像：%s
-                ・希望日程：%s
-                ・予算：%s
-                ・決められないこと：%s
-                ・こだわりたいこと：%s
-                """.formatted(archetype, desiredDate, budget, orNone(answer.getUndecidedTags()),
-                orNone(answer.getDecidedTags()));
+        return List.of(
+                new HearingAnswerItemView("理想のカップル像", archetype),
+                new HearingAnswerItemView("希望日程", desiredDate),
+                new HearingAnswerItemView("予算", budget),
+                new HearingAnswerItemView("決められないこと", orNone(answer.getUndecidedTags())),
+                new HearingAnswerItemView("こだわりたいこと", orNone(answer.getDecidedTags())));
+    }
+
+    /**
+     * STEP2 の好きな雰囲気の項目を作る。見出しの文を value に、テイストごとの細かい好みを details に分けて入れ、
+     * 画面では細かい好みを1件ずつ別の行に出す。Step2 をまだ答えていないときは「まだ答えていません」、
+     * 好きなテイストが無いときは「特になし」。
+     */
+    private HearingAnswerItemView styleItem(Long userId) {
+        Optional<VisualSummaryView> found = visualService.findVisualSummary(userId);
+        if (found.isEmpty()) {
+            return new HearingAnswerItemView("好きな雰囲気", "まだ答えていません");
+        }
+        VisualSummaryView summary = found.get();
+        if (summary.isEmpty()) {
+            return new HearingAnswerItemView("好きな雰囲気", "特になし");
+        }
+        List<String> details = summary.tasteResults().stream()
+                .map(TasteResult::detailText)
+                .toList();
+        return new HearingAnswerItemView("好きな雰囲気", summary.headline(), details);
     }
 
     private String orNone(String value) {
