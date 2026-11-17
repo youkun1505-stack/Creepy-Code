@@ -1,6 +1,8 @@
 package com.creepycode.hearing.controller;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.empty;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
@@ -11,6 +13,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -37,6 +40,7 @@ import com.creepycode.auth.service.LoginUser;
 import com.creepycode.common.config.SecurityConfig;
 import com.creepycode.common.exception.AiException;
 import com.creepycode.hearing.dto.AiChatMessageView;
+import com.creepycode.hearing.dto.HearingAnswerItemView;
 import com.creepycode.hearing.entity.AiChatMessage;
 import com.creepycode.hearing.service.AiChatService;
 
@@ -83,6 +87,47 @@ class DeepDiveControllerTest {
                 .andExpect(model().attribute("chatMessages", contains(
                         new AiChatMessageView("USER", "式場の予約はいつ？", time),
                         new AiChatMessageView("AI", "半年前からが目安です。", time))));
+    }
+
+    @Test
+    void 表示のときは_かんたん質問の答えを欄に渡し_画面にも出す() throws Exception {
+        when(aiChatService.findAnswerItems(1L)).thenReturn(List.of(
+                new HearingAnswerItemView("理想のカップル像", "ナチュラル（やさしい雰囲気）"),
+                new HearingAnswerItemView("予算", "3,000,000円")));
+
+        mockMvc.perform(get("/hearing/deepdive").with(user(CUSTOMER)))
+                .andExpect(status().isOk())
+                .andExpect(view().name("hearing/deepdive"))
+                .andExpect(model().attribute("answerItems", contains(
+                        new HearingAnswerItemView("理想のカップル像", "ナチュラル（やさしい雰囲気）"),
+                        new HearingAnswerItemView("予算", "3,000,000円"))))
+                .andExpect(content().string(containsString("かんたん質問の答え")))
+                .andExpect(content().string(containsString("3,000,000円")));
+    }
+
+    @Test
+    void 好きな雰囲気の細かい好みは_画面で1件ずつ別の行に出す() throws Exception {
+        when(aiChatService.findAnswerItems(1L)).thenReturn(List.of(
+                new HearingAnswerItemView("好きな雰囲気", "「ナチュラル」と「モダン」が好きなようです",
+                        List.of("なかでも「和」寄りです", "「和モダン」寄りです"))));
+
+        mockMvc.perform(get("/hearing/deepdive").with(user(CUSTOMER)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("「ナチュラル」と「モダン」が好きなようです")))
+                .andExpect(content().string(containsString(
+                        "<li class=\"deepdive-answers__detail\">なかでも「和」寄りです</li>")))
+                .andExpect(content().string(containsString(
+                        "<li class=\"deepdive-answers__detail\">「和モダン」寄りです</li>")));
+    }
+
+    @Test
+    void かんたん質問に答えていなければ_欄に_まだ答えていません_と出し_エラーにしない() throws Exception {
+        when(aiChatService.findAnswerItems(1L)).thenReturn(List.of());
+
+        mockMvc.perform(get("/hearing/deepdive").with(user(CUSTOMER)))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("answerItems", empty()))
+                .andExpect(content().string(containsString("まだ答えていません")));
     }
 
     @Test
