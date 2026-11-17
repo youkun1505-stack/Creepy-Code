@@ -76,7 +76,12 @@ public class SignInCallbackServer implements AutoCloseable {
             Thread.currentThread().interrupt();
             throw new ChatGptSignInException("サインインが中断されました。もう一度お試しください。");
         } finally {
+            // 中断された場合は、受け口を閉じる処理（HttpServer.stop）の中で中断の印が消えることがあるため、閉じたあとで付け直す
+            boolean interrupted = Thread.currentThread().isInterrupted();
             close();
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 
