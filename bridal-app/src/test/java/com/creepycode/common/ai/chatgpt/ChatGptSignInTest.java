@@ -16,6 +16,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.security.KeyPair;
@@ -248,6 +249,93 @@ class ChatGptSignInTest {
         assertThat(printed()).contains("消しました");
     }
 
+    @Test
+    void 初回のstateが違いで失敗したあと_やり直すと2回の認可URLのext_agent_host_idが同じ() throws IOException {
+        FakeBrowser browser = new FakeBrowser();
+        browser.stateToSend = "WRONG-STATE";
+        assertThatThrownBy(() -> service(browser, CLOCK).signIn(freePort()))
+                .isInstanceOf(ChatGptSignInException.class);
+        browser.stateToSend = null;
+
+        service(browser, CLOCK).signIn(freePort());
+
+        assertThat(browser.urls).hasSize(2);
+        String first = queryOf(browser.urls.get(0)).get("ext_agent_host_id");
+        String second = queryOf(browser.urls.get(1)).get("ext_agent_host_id");
+        assertThat(second).isEqualTo(first);
+        assertThat(store.loadRegistration())
+                .isEqualTo(Optional.of(new ChatGptRegistration(first, CLIENT_ID)));
+    }
+
+    @Test
+    void 初回がキャンセルされたあと_やり直すと2回の認可URLのext_agent_host_idが同じ() throws IOException {
+        FakeBrowser browser = new FakeBrowser();
+        browser.errorToSend = "access_denied";
+        assertThatThrownBy(() -> service(browser, CLOCK).signIn(freePort()))
+                .isInstanceOf(ChatGptSignInException.class)
+                .hasMessageContaining("キャンセル");
+        browser.errorToSend = null;
+
+        service(browser, CLOCK).signIn(freePort());
+
+        assertThat(browser.urls).hasSize(2);
+        assertThat(queryOf(browser.urls.get(1)).get("ext_agent_host_id"))
+                .isEqualTo(queryOf(browser.urls.get(0)).get("ext_agent_host_id"));
+    }
+
+    @Test
+    void サインイン用のURLを出す前に_ホストの値がhost_jsonに保存されている() throws IOException {
+        FakeBrowser browser = new FakeBrowser();
+
+        service(browser, CLOCK).signIn(freePort());
+
+        assertThat(browser.hostIdStoredWhenOpened)
+                .isEqualTo(Optional.of(queryOf(browser.urls.get(0)).get("ext_agent_host_id")));
+    }
+
+    @Test
+    void 登録情報があれば_host_jsonの値より登録情報のhostIdを使う() throws IOException {
+        store.saveHostId("host-from-file");
+        store.saveRegistration(new ChatGptRegistration("host-registered", CLIENT_ID));
+        FakeBrowser browser = new FakeBrowser();
+        browser.callbackClientId = null;
+
+        service(browser, CLOCK).signIn(freePort());
+
+        assertThat(queryOf(browser.urls.get(0))).containsEntry("ext_agent_host_id", "host-registered");
+    }
+
+    @Test
+    void host_jsonが壊れていたら日本語の例外で止まり_新しいhostIdを作らない() throws IOException {
+        Path hostFile = tempDir.resolve("chatgpt-java").resolve("host.json");
+        Files.createDirectories(hostFile.getParent());
+        Files.writeString(hostFile, "壊れた中身");
+        FakeBrowser browser = new FakeBrowser();
+
+        assertThatThrownBy(() -> service(browser, CLOCK).signIn(freePort()))
+                .isInstanceOf(ChatGptSignInException.class)
+                .hasMessageContaining("host.json");
+        assertThat(browser.urls).isEmpty();
+        assertThat(exchangeBodies).isEmpty();
+        assertThat(Files.readString(hostFile)).isEqualTo("壊れた中身");
+        assertThat(store.loadRegistration()).isEmpty();
+    }
+
+    @Test
+    void registration_jsonが壊れていたら_初回扱いにせず止まり_hostIdも作らない() throws IOException {
+        Path directory = tempDir.resolve("chatgpt-java");
+        Files.createDirectories(directory);
+        Files.writeString(directory.resolve("registration.json"), "{壊れた");
+        FakeBrowser browser = new FakeBrowser();
+
+        assertThatThrownBy(() -> service(browser, CLOCK).signIn(freePort()))
+                .isInstanceOf(ChatGptSignInException.class)
+                .hasMessageContaining("registration.json");
+        assertThat(browser.urls).isEmpty();
+        assertThat(exchangeBodies).isEmpty();
+        assertThat(store.loadHostId()).isEmpty();
+    }
+
     /**
      * サインインの操作を作る。画面に出された認可 URL（偽の接続先の認可の行）を、ブラウザの代わり（browser）に渡す。
      * 本物は利用者がブラウザに貼り付けるが、テストでは貼り付けの代わりに browser が戻りを送る。
@@ -296,17 +384,25 @@ class ChatGptSignInTest {
         String stateToSend;
         /** ID トークンに入れる nonce（null なら認可 URL の正しい値）。 */
         String nonceToSend;
+        /** 戻りで送る error（null なら送らない。access_denied でキャンセルを表す）。 */
+        String errorToSend;
         boolean withIdToken = true;
+        /** 認可 URL を受け取った時点で host.json に保存されていた hostId（URL を出す前に保存されているかを確かめる）。 */
+        Optional<String> hostIdStoredWhenOpened = Optional.empty();
 
         void open(String url) {
             urls.add(url);
             Map<String, String> query = queryOf(url);
+            hostIdStoredWhenOpened = store.loadHostId();
             String nonce = nonceToSend != null ? nonceToSend : query.get("nonce");
             tokenResponseBody = tokenBody(withIdToken ? idToken(nonce, audience) : null);
 
             String state = stateToSend != null ? stateToSend : query.get("state");
-            StringBuilder callback = new StringBuilder("code=CODE-OK&state=")
-                    .append(URLEncoder.encode(state, StandardCharsets.UTF_8));
+            StringBuilder callback = new StringBuilder();
+            if (errorToSend != null) {
+                callback.append("error=").append(URLEncoder.encode(errorToSend, StandardCharsets.UTF_8)).append('&');
+            }
+            callback.append("code=CODE-OK&state=").append(URLEncoder.encode(state, StandardCharsets.UTF_8));
             if (callbackClientId != null) {
                 callback.append("&client_id=").append(URLEncoder.encode(callbackClientId, StandardCharsets.UTF_8));
             }

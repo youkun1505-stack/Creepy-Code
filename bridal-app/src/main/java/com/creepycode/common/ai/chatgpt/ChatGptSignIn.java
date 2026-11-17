@@ -52,9 +52,12 @@ public class ChatGptSignIn {
      * @param port 戻り先のポート（127.0.0.1 で待ち受ける）
      */
     public void signIn(int port) {
-        ChatGptRegistration saved = store.loadRegistration().orElse(null);
-        // 初回は、このサインインの間だけ hostId を覚える。成功したときに登録情報として保存する
-        String hostId = saved != null ? saved.hostId() : ChatGptOAuthClient.newHostId();
+        // 登録情報があればその hostId を使う。無ければ、保存済みの hostId（host.json）を使い、無いときだけ作って保存する。
+        // 保存は URL を出す前に行う（初回が失敗しても、次のやり直しで同じ値を使うため）
+        ChatGptRegistration saved = store.loadRegistrationChecked().orElse(null);
+        String hostId = saved != null
+                ? saved.hostId()
+                : store.loadOrCreateHostId(ChatGptOAuthClient::newHostId);
         ChatGptAuthAttempt attempt = oauth.startAuthorization(port, hostId, saved);
 
         try (SignInCallbackServer server = new SignInCallbackServer(port, callbackTimeout)) {
