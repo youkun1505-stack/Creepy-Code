@@ -10,8 +10,11 @@ import java.util.Optional;
 /**
  * Sign in with ChatGPT の操作（サインイン・状態の表示・サインアウト）。Spring は起動しない（ChatGptSignInMain から呼ぶ）。
  * サインインは、戻り先の受け口を先に待ち受けてから、サインイン用の URL を画面に出し、
- * 利用者がブラウザに貼り付けて戻りを受けて交換し、ID トークンを確かめてから、登録情報と資格情報を保存する。
- * 確かめに通らなければ何も保存しない。ブラウザは、このアプリからは開かない。
+ * 利用者がブラウザに貼り付けて戻りを受ける。保存は次の順で行う。
+ * ・ホストの値（hostId）は、サインイン用の URL を出す前に host.json に保存する（やり直しでも同じ値を使うため）。
+ * ・初回は、戻りの確かめに通った時点で登録情報（hostId・発行された client_id）を保存する。交換や ID トークンの確かめで失敗しても残す。
+ * ・資格情報は、交換して ID トークンの確かめに通ったときだけ保存する。
+ * ブラウザは、このアプリからは開かない。
  * 画面に出すのは表示名と期限だけ（sub・トークン・code・state は出さない）。
  */
 public class ChatGptSignIn {
@@ -45,9 +48,10 @@ public class ChatGptSignIn {
     }
 
     /**
-     * サインインする。戻り先の受け口を先に待ち受け、サインイン用の URL を画面に出して戻りを待ち、
-     * 戻りを受けて交換し、ID トークンを確かめ、登録情報と資格情報を保存する。
-     * 途中で確かめに通らなければ例外にし、何も保存しない。
+     * サインインする。戻り先の受け口を先に待ち受け、サインイン用の URL を画面に出して戻りを待つ。
+     * 戻りの確かめに通ったら、初回は登録情報（hostId・client_id）を保存してから交換し、ID トークンを確かめ、
+     * 確かめに通ったときだけ資格情報を保存する。交換や ID トークンの確かめで失敗しても、登録情報は残る。
+     * 戻りの確かめに通らないとき（キャンセル・state が違う・code や client_id が無い）は、何も保存しない。
      *
      * @param port 戻り先のポート（127.0.0.1 で待ち受ける）
      */
@@ -67,11 +71,15 @@ public class ChatGptSignIn {
             out.println("サインインが終わるのを待っています。");
 
             ChatGptCallback callback = server.awaitCallback();
-            ChatGptSignInResult result = oauth.completeSignIn(attempt, callback);
+            // 戻りの確かめ。初回は、交換の前に登録情報（hostId・発行された client_id）を保存する（秘密ではないので暗号化しない）
+            ChatGptRegistration registration = oauth.checkCallback(attempt, callback);
+            if (attempt.isInitialRegistration()) {
+                store.saveRegistration(registration);
+            }
+            ChatGptSignInResult result = oauth.exchangeChecked(attempt, callback.code(), registration);
             IdTokenVerifier.VerifiedIdToken who = verifyIdToken(attempt, result);
 
-            // 確かめに通ってから保存する。登録情報（hostId）は秘密ではないので先に残す
-            store.saveRegistration(result.registration());
+            // ID トークンの確かめに通ってから資格情報を保存する
             store.save(result.credentials());
             out.println("サインインしました（表示名：" + who.displayName() + "）。サインイン情報を保存しました。");
         }

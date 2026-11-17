@@ -71,6 +71,10 @@ class ChatGptSignInTest {
     private KeyPair keys;
     private final List<String> exchangeBodies = new CopyOnWriteArrayList<>();
     private volatile String tokenResponseBody = "{}";
+    /** トークンの交換の応答の HTTP 番号（既定は 200。交換の失敗を確かめるときだけ変える）。 */
+    private volatile int tokenStatus = 200;
+    /** 交換の要求を受けた時点で保存されていた登録情報（交換の前に保存されているかを確かめる）。 */
+    private volatile Optional<ChatGptRegistration> registrationSeenByExchange = Optional.empty();
     private ChatGptCredentialStore store;
     private ByteArrayOutputStream output;
 
@@ -82,7 +86,9 @@ class ChatGptSignInTest {
         fake = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         fake.createContext(TOKEN_PATH, exchange -> {
             exchangeBodies.add(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-            reply(exchange, tokenResponseBody);
+            // 交換の時点で登録情報が保存済みかを控える（交換の前に保存していることを確かめるため）
+            registrationSeenByExchange = store.loadRegistration();
+            replyWithStatus(exchange, tokenStatus, tokenResponseBody);
         });
         fake.createContext(JWKS_PATH, exchange -> reply(exchange, jwksBody()));
         fake.start();
@@ -153,7 +159,7 @@ class ChatGptSignInTest {
     }
 
     @Test
-    void IDトークンのnonceが違うときは_交換のあとでも保存せず例外になる() throws IOException {
+    void IDトークンのnonceが違うときは_登録情報は残し_資格情報は保存せず例外になる() throws IOException {
         FakeBrowser browser = new FakeBrowser();
         browser.nonceToSend = "WRONG-NONCE";
 
@@ -162,11 +168,13 @@ class ChatGptSignInTest {
                 .hasMessageContaining("nonce");
         assertThat(exchangeBodies).hasSize(1);
         assertThat(store.load()).isEmpty();
-        assertThat(store.loadRegistration()).isEmpty();
+        assertThat(store.loadRegistration())
+                .isEqualTo(Optional.of(new ChatGptRegistration(queryOf(browser.urls.get(0)).get("ext_agent_host_id"),
+                        CLIENT_ID)));
     }
 
     @Test
-    void IDトークンが戻らないときは保存せず例外になる() throws IOException {
+    void IDトークンが戻らないときは_登録情報は残し_資格情報は保存せず例外になる() throws IOException {
         FakeBrowser browser = new FakeBrowser();
         browser.withIdToken = false;
 
@@ -174,7 +182,9 @@ class ChatGptSignInTest {
                 .isInstanceOf(ChatGptSignInException.class)
                 .hasMessageContaining("ID トークン");
         assertThat(store.load()).isEmpty();
-        assertThat(store.loadRegistration()).isEmpty();
+        assertThat(store.loadRegistration())
+                .isEqualTo(Optional.of(new ChatGptRegistration(queryOf(browser.urls.get(0)).get("ext_agent_host_id"),
+                        CLIENT_ID)));
     }
 
     @Test
@@ -336,6 +346,83 @@ class ChatGptSignInTest {
         assertThat(store.loadHostId()).isEmpty();
     }
 
+    @Test
+    void 初回の交換が失敗しても_交換の前に保存した登録情報は残り_資格情報は保存しない() throws IOException {
+        tokenStatus = 500;
+        FakeBrowser browser = new FakeBrowser();
+
+        assertThatThrownBy(() -> service(browser, CLOCK).signIn(freePort()))
+                .isInstanceOf(ChatGptSignInException.class)
+                .hasMessageContaining("HTTP 500");
+        String hostId = queryOf(browser.urls.get(0)).get("ext_agent_host_id");
+        ChatGptRegistration expected = new ChatGptRegistration(hostId, CLIENT_ID);
+        assertThat(registrationSeenByExchange).isEqualTo(Optional.of(expected));
+        assertThat(store.loadRegistration()).isEqualTo(Optional.of(expected));
+        assertThat(store.load()).isEmpty();
+    }
+
+    @Test
+    void nonceが違いで失敗したあと_もう一度サインインすると_保存したclient_idを登録済みとして使う() throws IOException {
+        FakeBrowser browser = new FakeBrowser();
+        browser.nonceToSend = "WRONG-NONCE";
+        assertThatThrownBy(() -> service(browser, CLOCK).signIn(freePort()))
+                .isInstanceOf(ChatGptSignInException.class);
+        browser.nonceToSend = null;
+
+        service(browser, CLOCK).signIn(freePort());
+
+        assertThat(browser.urls).hasSize(2);
+        Map<String, String> second = queryOf(browser.urls.get(1));
+        assertThat(second).containsEntry("client_id", CLIENT_ID)
+                .containsEntry("ext_agent_host_id", queryOf(browser.urls.get(0)).get("ext_agent_host_id"))
+                .doesNotContainKey("agent_name_hint");
+        assertThat(parseForm(exchangeBodies.get(1))).containsEntry("client_id", CLIENT_ID);
+        assertThat(store.load()).isPresent();
+    }
+
+    @Test
+    void キャンセルや_client_idが無い戻りでは_登録情報を保存しない() throws IOException {
+        FakeBrowser browser = new FakeBrowser();
+        browser.errorToSend = "access_denied";
+        assertThatThrownBy(() -> service(browser, CLOCK).signIn(freePort()))
+                .isInstanceOf(ChatGptSignInException.class)
+                .hasMessageContaining("キャンセル");
+        assertThat(store.loadRegistration()).isEmpty();
+
+        browser.errorToSend = null;
+        browser.callbackClientId = null;
+        assertThatThrownBy(() -> service(browser, CLOCK).signIn(freePort()))
+                .isInstanceOf(ChatGptSignInException.class)
+                .hasMessageContaining("登録できませんでした");
+        assertThat(store.loadRegistration()).isEmpty();
+
+        browser.callbackClientId = "dynamic_agent_client";
+        assertThatThrownBy(() -> service(browser, CLOCK).signIn(freePort()))
+                .isInstanceOf(ChatGptSignInException.class)
+                .hasMessageContaining("登録できませんでした");
+        assertThat(store.loadRegistration()).isEmpty();
+        assertThat(exchangeBodies).isEmpty();
+        assertThat(store.load()).isEmpty();
+    }
+
+    @Test
+    void サインアウトのあとサインインすると_同じhostIdとclient_idを使う() throws IOException {
+        FakeBrowser browser = new FakeBrowser();
+        service(browser, CLOCK).signIn(freePort());
+        service(browser, CLOCK).signOut();
+
+        service(browser, CLOCK).signIn(freePort());
+
+        assertThat(browser.urls).hasSize(2);
+        Map<String, String> second = queryOf(browser.urls.get(1));
+        String hostId = queryOf(browser.urls.get(0)).get("ext_agent_host_id");
+        assertThat(second).containsEntry("client_id", CLIENT_ID)
+                .containsEntry("ext_agent_host_id", hostId)
+                .doesNotContainKey("agent_name_hint");
+        assertThat(store.loadRegistration()).isEqualTo(Optional.of(new ChatGptRegistration(hostId, CLIENT_ID)));
+        assertThat(store.load()).isPresent();
+    }
+
     /**
      * サインインの操作を作る。画面に出された認可 URL（偽の接続先の認可の行）を、ブラウザの代わり（browser）に渡す。
      * 本物は利用者がブラウザに貼り付けるが、テストでは貼り付けの代わりに browser が戻りを送る。
@@ -460,9 +547,13 @@ class ChatGptSignInTest {
     }
 
     private static void reply(HttpExchange exchange, String body) throws IOException {
+        replyWithStatus(exchange, 200, body);
+    }
+
+    private static void replyWithStatus(HttpExchange exchange, int status, String body) throws IOException {
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().add("Content-Type", "application/json");
-        exchange.sendResponseHeaders(200, bytes.length);
+        exchange.sendResponseHeaders(status, bytes.length);
         try (OutputStream out = exchange.getResponseBody()) {
             out.write(bytes);
         }
