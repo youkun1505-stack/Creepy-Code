@@ -2,7 +2,6 @@ package com.creepycode.auth.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -40,9 +39,6 @@ import com.creepycode.common.exception.EmailAlreadyRegisteredException;
 @Import(SecurityConfig.class)
 class RegisterControllerTest {
 
-    private static final LoginUser REGISTERED =
-            new LoginUser(10L, "hanako@example.com", null, "山田 花子", UserRole.CUSTOMER);
-
     @Autowired
     private MockMvc mockMvc;
 
@@ -58,41 +54,39 @@ class RegisterControllerTest {
     @BeforeEach
     void setUp() {
         when(loginService.homeUrl(UserRole.CUSTOMER)).thenReturn("/");
-        when(registerService.register(any())).thenReturn(REGISTERED);
+        when(registerService.register(any())).thenReturn(null);
     }
 
     @Test
-    void 正しく入力すると_登録して自動でログインし_ハブへ進めて完了の案内を出す() throws Exception {
+    void 新規登録は_登録してログイン画面へ進め共通の案内を出す() throws Exception {
         mockMvc.perform(form("山田 花子", "hanako@example.com", "abc12345", "abc12345"))
-                .andExpect(redirectedUrl("/"))
-                .andExpect(flash().attribute("flashMessage", "会員登録が完了しました。まずはかんたんな質問からはじめましょう。"));
+                .andExpect(redirectedUrl("/auth/login"))
+                .andExpect(flash().attribute("flashMessage", "登録を受け付けました。ログイン画面をご確認ください。"));
 
         verify(registerService).register(any());
-        verify(loginService).startSession(eq(REGISTERED), any(), any());
-    }
-
-    @Test
-    void 登録済みのメールアドレスは_エラーを出して登録しない() throws Exception {
-        when(registerService.isEmailRegistered("customer@example.com")).thenReturn(true);
-
-        mockMvc.perform(form("山田 花子", "customer@example.com", "abc12345", "abc12345"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("auth/register"))
-                .andExpect(model().attributeHasFieldErrorCode("registerForm", "email", "registered"));
-
-        verify(registerService, never()).register(any());
         verify(loginService, never()).startSession(any(), any(), any());
     }
 
     @Test
-    void 確認の直後に同じメールアドレスが登録されたときも_同じエラーを出す() throws Exception {
+    void 登録済みメールは_新規登録と同じ案内でログイン画面へ進める() throws Exception {
+        when(registerService.register(any()))
+                .thenThrow(new EmailAlreadyRegisteredException(new DataIntegrityViolationException("UK_USERS_EMAIL")));
+
+        mockMvc.perform(form("山田 花子", "customer@example.com", "abc12345", "abc12345"))
+                .andExpect(redirectedUrl("/auth/login"))
+                .andExpect(flash().attribute("flashMessage", "登録を受け付けました。ログイン画面をご確認ください。"));
+
+        verify(loginService, never()).startSession(any(), any(), any());
+    }
+
+    @Test
+    void 登録時に重複が判明した場合も_同じ完了案内を出す() throws Exception {
         when(registerService.register(any()))
                 .thenThrow(new EmailAlreadyRegisteredException(new DataIntegrityViolationException("UK_USERS_EMAIL")));
 
         mockMvc.perform(form("山田 花子", "hanako@example.com", "abc12345", "abc12345"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("auth/register"))
-                .andExpect(model().attributeHasFieldErrorCode("registerForm", "email", "registered"));
+                .andExpect(redirectedUrl("/auth/login"))
+                .andExpect(flash().attribute("flashMessage", "登録を受け付けました。ログイン画面をご確認ください。"));
 
         verify(loginService, never()).startSession(any(), any(), any());
     }

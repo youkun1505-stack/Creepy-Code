@@ -14,6 +14,8 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -131,6 +133,36 @@ class LoginControllerTest {
                 .andExpect(model().attributeHasFieldErrors("loginForm", "email", "password"));
 
         verify(loginService, never()).authenticate(anyString(), anyString());
+    }
+
+    @Test
+    void パスワードが72文字を超えるときは_認証処理へ渡さない() throws Exception {
+        mockMvc.perform(post("/auth/login").with(csrf())
+                .param("email", "customer@example.com").param("password", "a1".repeat(36) + "b"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("auth/login"))
+                .andExpect(model().attributeHasFieldErrors("loginForm", "password"));
+
+        verify(loginService, never()).authenticate(anyString(), anyString());
+    }
+
+    @Test
+    void UTF8で72バイトを超えるパスワードは_認証処理へ渡さない() throws Exception {
+        mockMvc.perform(post("/auth/login").with(csrf())
+                .param("email", "customer@example.com").param("password", "あ".repeat(25)))
+                .andExpect(status().isOk())
+                .andExpect(view().name("auth/login"))
+                .andExpect(model().attributeHasFieldErrors("loginForm", "password"));
+
+        verify(loginService, never()).authenticate(anyString(), anyString());
+    }
+
+    @Test
+    void 登録案内をログイン画面に表示する() throws Exception {
+        mockMvc.perform(get("/auth/login").flashAttr("flashMessage", "登録を受け付けました。ログイン画面をご確認ください。"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "登録を受け付けました。ログイン画面をご確認ください。")));
     }
 
     @Test

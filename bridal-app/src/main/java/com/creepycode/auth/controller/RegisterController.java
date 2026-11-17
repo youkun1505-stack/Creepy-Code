@@ -17,25 +17,19 @@ import com.creepycode.auth.service.LoginUser;
 import com.creepycode.auth.service.RegisterService;
 import com.creepycode.common.exception.EmailAlreadyRegisteredException;
 
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 
 /**
  * 会員登録画面（P-02）。
- * 登録が終わったら、そのままログインした状態にしてログイン後のトップページ（P-01 のハブ）へ進め、完了の案内を出す。
+ * 登録後はログイン画面へ進め、登録有無を推測できない共通の案内を出す。
  */
 @Controller
 @RequestMapping("/auth/register")
 public class RegisterController {
 
     private static final String VIEW = "auth/register";
-    // 登録したら、すぐにログイン後のトップページ（P-01 のハブ）へ進める
-    private static final String URL_AFTER_REGISTER = "/";
     private static final String URL_LOGIN = "/auth/login";
-    // ハブ（P-01）の上に一度だけ出す案内
-    private static final String COMPLETE_MESSAGE = "会員登録が完了しました。まずはかんたんな質問からはじめましょう。";
-    private static final String REGISTERED_MESSAGE = "このメールアドレスはすでに登録されています。ログインしてください";
+    private static final String COMPLETE_MESSAGE = "登録を受け付けました。ログイン画面をご確認ください。";
 
     private final RegisterService registerService;
     private final LoginService loginService;
@@ -60,35 +54,25 @@ public class RegisterController {
     @PostMapping
     public String register(@AuthenticationPrincipal LoginUser loginUser,
             @Valid @ModelAttribute RegisterForm registerForm, BindingResult bindingResult,
-            Model model, RedirectAttributes redirectAttributes,
-            HttpServletRequest request, HttpServletResponse response) {
+            Model model, RedirectAttributes redirectAttributes) {
         // ログイン中の人は登録できない（別の会員を作って、ログインし直すのを防ぐ）
         if (loginUser != null) {
             return "redirect:" + loginService.homeUrl(loginUser.getRole());
         }
 
         checkPasswordConfirm(registerForm, bindingResult);
-        // メールアドレスの形が正しいときだけ、登録済みかを確かめる（エラーを2つ重ねて出さないため）
-        if (!bindingResult.hasFieldErrors("email") && registerService.isEmailRegistered(registerForm.getEmail())) {
-            bindingResult.rejectValue("email", "registered", REGISTERED_MESSAGE);
-        }
         if (bindingResult.hasErrors()) {
             return showAgain(registerForm, model);
         }
 
-        LoginUser registered;
         try {
-            registered = registerService.register(registerForm);
+            registerService.register(registerForm);
         } catch (EmailAlreadyRegisteredException e) {
-            // 上の確認のあとに、同じメールアドレスが登録されたとき
-            bindingResult.rejectValue("email", "registered", REGISTERED_MESSAGE);
-            return showAgain(registerForm, model);
+            // 登録済みかどうかを画面から推測できないよう、新規登録と同じ案内を返す
         }
 
-        // 登録した会員を、ログイン画面を通さずにそのままログインさせる（P-02 の仕様変更）
-        loginService.startSession(registered, request, response);
         redirectAttributes.addFlashAttribute("flashMessage", COMPLETE_MESSAGE);
-        return "redirect:" + URL_AFTER_REGISTER;
+        return "redirect:" + URL_LOGIN;
     }
 
     /** 入力し直してもらうために、同じ画面をもう一度出す。パスワードは画面に戻さない（氏名とメールアドレスは残す）。 */
