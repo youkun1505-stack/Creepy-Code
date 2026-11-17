@@ -38,6 +38,12 @@ public class AiChatService {
     /** 発言の長さの上限（字）。画面の入力欄も同じ上限にする。 */
     public static final int MAX_LENGTH = 1000;
 
+    /** AI に渡す過去の発言の件数の上限（新しいほうから数える。10往復ぶん）。 */
+    static final int MAX_HISTORY_MESSAGES = 20;
+
+    /** AI に渡す過去の発言の本文の合計字数の上限（字数は文字（コードポイント）で数える）。 */
+    static final int MAX_HISTORY_CHARS = 8000;
+
     private static final String INSTRUCTIONS = """
             あなたは結婚式場のプランナーの助手です。
             お客様（利用者）の質問に、結婚式の準備に関する知識をもとに、わかりやすく答えてください。
@@ -96,11 +102,12 @@ public class AiChatService {
     public ChatReply sendMessage(Long userId, String rawContent) {
         String content = validate(rawContent);
 
-        // 今までのやり取りに、今回の発言を最後に足して AI に渡す
-        List<ChatTurn> turns = new ArrayList<>();
-        for (AiChatMessage past : findHistory(userId)) {
-            turns.add(new ChatTurn(past.getRole(), past.getContent()));
+        // 今までのやり取りのうち、件数と字数の上限に収まる新しいほうの分だけを渡し、今回の発言を最後に足す
+        List<ChatTurn> past = new ArrayList<>();
+        for (AiChatMessage message : findHistory(userId)) {
+            past.add(new ChatTurn(message.getRole(), message.getContent()));
         }
+        List<ChatTurn> turns = new ArrayList<>(limitHistory(past));
         turns.add(new ChatTurn(AiChatMessage.ROLE_USER, content));
 
         String reply = aiClient.generateReply(buildInstructions(userId), turns);
@@ -136,6 +143,28 @@ public class AiChatService {
             throw new IllegalArgumentException("発言は" + MAX_LENGTH + "字以内で入力してください。");
         }
         return content;
+    }
+
+    /**
+     * 過去の発言のうち、新しいほうから数えて件数と字数の両方の上限に収まる分だけを、古い順のまま返す。
+     * 新しいほうから順に足していき、上限を超える発言に当たったら、それより古い発言はすべて除く
+     * （途中で本文を切ることはしない）。
+     */
+    static List<ChatTurn> limitHistory(List<ChatTurn> past) {
+        List<ChatTurn> kept = new ArrayList<>();
+        int totalChars = 0;
+        for (int i = past.size() - 1; i >= 0 && kept.size() < MAX_HISTORY_MESSAGES; i--) {
+            ChatTurn turn = past.get(i);
+            String text = turn.content() == null ? "" : turn.content();
+            int chars = text.codePointCount(0, text.length());
+            if (totalChars + chars > MAX_HISTORY_CHARS) {
+                break;
+            }
+            totalChars += chars;
+            // 新しいほうから足しているので、先頭に入れて古い順に並べ直す
+            kept.add(0, turn);
+        }
+        return kept;
     }
 
     /**
