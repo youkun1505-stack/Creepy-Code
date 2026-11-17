@@ -2,6 +2,8 @@ package com.creepycode.hearing.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.empty;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -15,6 +17,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -30,6 +33,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockMultipartFile;
@@ -38,6 +42,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.transaction.CannotCreateTransactionException;
 
 import com.creepycode.auth.entity.UserRole;
 import com.creepycode.auth.service.LoginUser;
@@ -45,8 +50,10 @@ import com.creepycode.common.ai.AiAttachment;
 import com.creepycode.common.config.SecurityConfig;
 import com.creepycode.common.exception.AiException;
 import com.creepycode.hearing.dto.AiChatMessageView;
+import com.creepycode.hearing.dto.HearingAnswerItemView;
 import com.creepycode.hearing.entity.AiChatMessage;
 import com.creepycode.hearing.service.AiChatService;
+import com.creepycode.hearing.service.ChatReply;
 
 /**
  * AI相談チャット（P-10）の Controller のテスト。DB は使わず、Service は偽物にする。
@@ -97,8 +104,49 @@ class DeepDiveControllerTest {
     }
 
     @Test
+    void 表示のときは_かんたん質問の答えを欄に渡し_画面にも出す() throws Exception {
+        when(aiChatService.findAnswerItems(1L)).thenReturn(List.of(
+                new HearingAnswerItemView("理想のカップル像", "ナチュラル（やさしい雰囲気）"),
+                new HearingAnswerItemView("予算", "3,000,000円")));
+
+        mockMvc.perform(get("/hearing/deepdive").with(user(CUSTOMER)))
+                .andExpect(status().isOk())
+                .andExpect(view().name("hearing/deepdive"))
+                .andExpect(model().attribute("answerItems", contains(
+                        new HearingAnswerItemView("理想のカップル像", "ナチュラル（やさしい雰囲気）"),
+                        new HearingAnswerItemView("予算", "3,000,000円"))))
+                .andExpect(content().string(containsString("かんたん質問の答え")))
+                .andExpect(content().string(containsString("3,000,000円")));
+    }
+
+    @Test
+    void 好きな雰囲気の細かい好みは_画面で1件ずつ別の行に出す() throws Exception {
+        when(aiChatService.findAnswerItems(1L)).thenReturn(List.of(
+                new HearingAnswerItemView("好きな雰囲気", "「ナチュラル」と「モダン」が好きなようです",
+                        List.of("なかでも「和」寄りです", "「和モダン」寄りです"))));
+
+        mockMvc.perform(get("/hearing/deepdive").with(user(CUSTOMER)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("「ナチュラル」と「モダン」が好きなようです")))
+                .andExpect(content().string(containsString(
+                        "<li class=\"deepdive-answers__detail\">なかでも「和」寄りです</li>")))
+                .andExpect(content().string(containsString(
+                        "<li class=\"deepdive-answers__detail\">「和モダン」寄りです</li>")));
+    }
+
+    @Test
+    void かんたん質問に答えていなければ_欄に_まだ答えていません_と出し_エラーにしない() throws Exception {
+        when(aiChatService.findAnswerItems(1L)).thenReturn(List.of());
+
+        mockMvc.perform(get("/hearing/deepdive").with(user(CUSTOMER)))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("answerItems", empty()))
+                .andExpect(content().string(containsString("まだ答えていません")));
+    }
+
+    @Test
     void 発言を受けると_AIの返事を200とJSONで返す() throws Exception {
-        when(aiChatService.sendMessage(anyLong(), anyString())).thenReturn("返事です。");
+        when(aiChatService.sendMessage(anyLong(), anyString())).thenReturn(new ChatReply("返事です。", true));
 
         send(PATH, "{\"content\":\"質問です\"}", null)
                 .andExpect(status().isOk())
@@ -152,7 +200,7 @@ class DeepDiveControllerTest {
                 .andExpect(jsonPath("$.giveUp").value(true));
 
         // 成功すると、失敗の数は数え直す
-        doReturn("返事です。").when(aiChatService).sendMessage(anyLong(), anyString());
+        doReturn(new ChatReply("返事です。", true)).when(aiChatService).sendMessage(anyLong(), anyString());
         send(PATH, "{\"content\":\"質問\"}", session).andExpect(status().isOk());
 
         doThrow(new AiException("時間切れ")).when(aiChatService).sendMessage(anyLong(), anyString());
@@ -178,10 +226,67 @@ class DeepDiveControllerTest {
     }
 
     @Test
+    void 返事は作れたが保存できなかったら_200で返事と案内を返し_失敗の回数は変えない() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        doThrow(new AiException("時間切れ")).when(aiChatService).sendMessage(anyLong(), anyString());
+        send(PATH, "{\"content\":\"質問\"}", session).andExpect(jsonPath("$.giveUp").value(false));
+        send(PATH, "{\"content\":\"質問\"}", session).andExpect(jsonPath("$.giveUp").value(false));
+
+        // 保存だけが失敗：返事は出し、案内を添える。失敗の数は増えない（この時点で 2 回のまま）
+        doReturn(new ChatReply("返事です。", false)).when(aiChatService).sendMessage(anyLong(), anyString());
+        send(PATH, "{\"content\":\"質問\"}", session)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ok").value(true))
+                .andExpect(jsonPath("$.reply").value("返事です。"))
+                .andExpect(jsonPath("$.saved").value(false))
+                .andExpect(jsonPath("$.notice").value("この返事は保存できませんでした。画面を読み込み直すと消えます。"));
+
+        // 次の AI の失敗で 3 回目になる（保存の失敗で数え直されていれば、ここは false になる）
+        doThrow(new AiException("時間切れ")).when(aiChatService).sendMessage(anyLong(), anyString());
+        send(PATH, "{\"content\":\"質問\"}", session)
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.giveUp").value(true));
+    }
+
+    @Test
+    void 履歴の読み出しがDBの失敗なら_502と案内を返し_中の例外は出さず_回数に数える() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        doThrow(new DataAccessResourceFailureException("DB 接続の詳細")).when(aiChatService)
+                .sendMessage(anyLong(), anyString());
+
+        send(PATH, "{\"content\":\"質問\"}", session)
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.ok").value(false))
+                .andExpect(jsonPath("$.message").value("相談の履歴を読み込めませんでした。もう一度お試しください。"))
+                .andExpect(jsonPath("$.giveUp").value(false));
+        send(PATH, "{\"content\":\"質問\"}", session).andExpect(jsonPath("$.giveUp").value(false));
+        send(PATH, "{\"content\":\"質問\"}", session)
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.giveUp").value(true));
+    }
+
+    @Test
+    void DBに接続できない履歴の読み出しでも_502と案内を返し_中の例外は出さず_回数に数える() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        doThrow(new CannotCreateTransactionException("Could not open JPA EntityManager for transaction"))
+                .when(aiChatService).sendMessage(anyLong(), anyString());
+
+        send(PATH, "{\"content\":\"質問\"}", session)
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.ok").value(false))
+                .andExpect(jsonPath("$.message").value("相談の履歴を読み込めませんでした。もう一度お試しください。"))
+                .andExpect(jsonPath("$.giveUp").value(false));
+        send(PATH, "{\"content\":\"質問\"}", session).andExpect(jsonPath("$.giveUp").value(false));
+        send(PATH, "{\"content\":\"質問\"}", session)
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.giveUp").value(true));
+    }
+
+    @Test
     void ログイン中の顧客のUSER_IDで_履歴を読み_発言を送る() throws Exception {
         // 以前の仮の USER_ID（1）とは違う番号の顧客でログインし、その番号が使われることを確かめる
         LoginUser other = new LoginUser(42L, "hanako@example.com", null, "山田 花子", UserRole.CUSTOMER);
-        when(aiChatService.sendMessage(anyLong(), anyString())).thenReturn("返事です。");
+        when(aiChatService.sendMessage(anyLong(), anyString())).thenReturn(new ChatReply("返事です。", true));
 
         mockMvc.perform(get("/hearing/deepdive").with(user(other))).andExpect(status().isOk());
         mockMvc.perform(post(PATH).with(user(other)).with(csrf())
@@ -194,7 +299,7 @@ class DeepDiveControllerTest {
 
     @Test
     void 画像つきの送信は_文章とファイルを受け取り_返事を200で返す() throws Exception {
-        when(aiChatService.sendMessage(anyLong(), anyString(), any(AiAttachment.class))).thenReturn("写真を見ました。");
+        when(aiChatService.sendMessage(anyLong(), anyString(), any(AiAttachment.class))).thenReturn(new ChatReply("写真を見ました。", true));
 
         sendMultipart(file("photo.png", "image/png", PNG_DATA), "この会場はどうですか")
                 .andExpect(status().isOk())
@@ -211,7 +316,7 @@ class DeepDiveControllerTest {
 
     @Test
     void PDFの添付も受け取る() throws Exception {
-        when(aiChatService.sendMessage(anyLong(), anyString(), any(AiAttachment.class))).thenReturn("見積もりを見ました。");
+        when(aiChatService.sendMessage(anyLong(), anyString(), any(AiAttachment.class))).thenReturn(new ChatReply("見積もりを見ました。", true));
 
         sendMultipart(file("estimate.pdf", "application/pdf", PDF_DATA), "この見積もりは高いですか")
                 .andExpect(status().isOk())
@@ -224,7 +329,7 @@ class DeepDiveControllerTest {
 
     @Test
     void 添付が無い文章だけのmultipartは_添付なしとして送る() throws Exception {
-        when(aiChatService.sendMessage(anyLong(), anyString())).thenReturn("返事です。");
+        when(aiChatService.sendMessage(anyLong(), anyString())).thenReturn(new ChatReply("返事です。", true));
 
         mockMvc.perform(multipart(PATH).param("content", "質問です").with(user(CUSTOMER)).with(csrf()))
                 .andExpect(status().isOk())

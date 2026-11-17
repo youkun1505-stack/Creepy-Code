@@ -36,7 +36,8 @@
     let pendingFile = null;
 
     // 発言を1件、吹き出しとして一覧の下に足す。本文は textContent で入れる（HTML として解釈しない）
-    function addBubble(role, text) {
+    // note を渡したときは、吹き出しの下に案内の文を添える（保存できなかった旨など）
+    function addBubble(role, text, note) {
         const item = document.createElement('li');
         item.className = 'deepdive-message ' + (role === 'USER' ? 'deepdive-message--user' : 'deepdive-message--ai');
         const bubble = document.createElement('div');
@@ -48,6 +49,13 @@
         body.className = 'deepdive-message__text';
         body.textContent = text;
         bubble.append(speaker, body);
+        if (note) {
+            const noteElement = document.createElement('p');
+            noteElement.className = 'deepdive-message__notice';
+            noteElement.setAttribute('role', 'status');
+            noteElement.textContent = note;
+            bubble.append(noteElement);
+        }
         item.append(bubble);
         log.append(item);
     }
@@ -162,7 +170,9 @@
                 // 履歴と同じ形で、添付があれば「（添付：ファイル名）」を発言の後ろに付けて出す
                 const shown = file ? content + '\n（添付：' + file.name + '）' : content;
                 addBubble('USER', shown);
-                addBubble('AI', result.reply);
+                // 保存できなかったときは、返事の吹き出しに案内を添える（入力欄の扱いは成功時と同じ）
+                const notice = result.saved === false && typeof result.notice === 'string' ? result.notice : null;
+                addBubble('AI', result.reply, notice);
                 hideGuide();
                 // 返事を待つあいだに利用者が書き換えていたら、その文は消さない
                 if (input.value === content) {
