@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -19,6 +20,11 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.transaction.CannotCreateTransactionException;
+import org.springframework.transaction.TransactionException;
+import org.springframework.transaction.TransactionSystemException;
 
 import com.creepycode.common.ai.AiClient;
 import com.creepycode.common.ai.ChatTurn;
@@ -62,9 +68,10 @@ class AiChatServiceTest {
     void 発言を保存してAIの返事を返す() {
         when(aiClient.generateReply(anyString(), anyList())).thenReturn("  お答えします  ");
 
-        String reply = service.sendMessage(USER_ID, "  式場の選び方を教えてください  ");
+        ChatReply result = service.sendMessage(USER_ID, "  式場の選び方を教えてください  ");
 
-        assertThat(reply).isEqualTo("お答えします");
+        assertThat(result.reply()).isEqualTo("お答えします");
+        assertThat(result.saved()).isTrue();
         // 2件は1回の saveAll でまとめて保存され、利用者の発言が先、AI の返事があとに並ぶ（前後の空白は消える）
         @SuppressWarnings({ "unchecked", "rawtypes" })
         ArgumentCaptor<List<AiChatMessage>> captor = (ArgumentCaptor) ArgumentCaptor.forClass(List.class);
@@ -104,7 +111,7 @@ class AiChatServiceTest {
     void 上限ちょうどの長さの発言は受け付ける() {
         when(aiClient.generateReply(anyString(), anyList())).thenReturn("返事");
 
-        assertThat(service.sendMessage(USER_ID, "あ".repeat(1000))).isEqualTo("返事");
+        assertThat(service.sendMessage(USER_ID, "あ".repeat(1000)).reply()).isEqualTo("返事");
     }
 
     @Test
@@ -125,6 +132,69 @@ class AiChatServiceTest {
                 .hasMessage("AI の呼び出しに失敗しました");
 
         verify(chatRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    void 履歴の読み出しがDBの失敗なら_AIを呼ばず_保存もせず_DataAccessExceptionを伝える() {
+        when(chatRepository.findByUserIdOrderByCreatedAtAscMessageIdAsc(USER_ID))
+                .thenThrow(new DataAccessResourceFailureException("DB に接続できません"));
+
+        assertThatThrownBy(() -> service.sendMessage(USER_ID, "質問"))
+                .isInstanceOf(DataAccessException.class);
+
+        verify(aiClient, never()).generateReply(anyString(), anyList());
+        verify(chatRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    void AIの返事のあとの保存がDBの失敗なら_例外にせず_返事を返して_保存できなかったことを伝える() {
+        when(aiClient.generateReply(anyString(), anyList())).thenReturn("お答えします");
+        doThrow(new DataAccessResourceFailureException("DB に接続できません"))
+                .when(chatRepository).saveAll(anyList());
+
+        ChatReply result = service.sendMessage(USER_ID, "質問");
+
+        assertThat(result.reply()).isEqualTo("お答えします");
+        assertThat(result.saved()).isFalse();
+        verify(chatRepository, times(1)).saveAll(anyList());
+    }
+
+    @Test
+    void 履歴の読み出しがDB接続不可のトランザクションの失敗なら_AIを呼ばず_TransactionExceptionを伝える() {
+        when(chatRepository.findByUserIdOrderByCreatedAtAscMessageIdAsc(USER_ID))
+                .thenThrow(new CannotCreateTransactionException("Could not open JPA EntityManager for transaction"));
+
+        assertThatThrownBy(() -> service.sendMessage(USER_ID, "質問"))
+                .isInstanceOf(TransactionException.class);
+
+        verify(aiClient, never()).generateReply(anyString(), anyList());
+        verify(chatRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    void AIの返事のあとの保存がDB接続不可のトランザクションの失敗なら_例外にせず_返事を返して_保存できなかったことを伝える() {
+        when(aiClient.generateReply(anyString(), anyList())).thenReturn("お答えします");
+        doThrow(new CannotCreateTransactionException("Could not open JPA EntityManager for transaction"))
+                .when(chatRepository).saveAll(anyList());
+
+        ChatReply result = service.sendMessage(USER_ID, "質問");
+
+        assertThat(result.reply()).isEqualTo("お答えします");
+        assertThat(result.saved()).isFalse();
+        verify(chatRepository, times(1)).saveAll(anyList());
+    }
+
+    @Test
+    void AIの返事のあとの保存がcommitの失敗なら_例外にせず_返事を返して_保存できなかったことを伝える() {
+        when(aiClient.generateReply(anyString(), anyList())).thenReturn("お答えします");
+        doThrow(new TransactionSystemException("Could not commit JPA transaction"))
+                .when(chatRepository).saveAll(anyList());
+
+        ChatReply result = service.sendMessage(USER_ID, "質問");
+
+        assertThat(result.reply()).isEqualTo("お答えします");
+        assertThat(result.saved()).isFalse();
+        verify(chatRepository, times(1)).saveAll(anyList());
     }
 
     @Test

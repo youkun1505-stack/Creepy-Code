@@ -223,6 +223,15 @@ h3 {
     white-space: pre-wrap;
 }
 
+/* 返事は出せたが保存できなかったときの案内（吹き出しの下に添える） */
+.deepdive-message__notice {
+    margin: 0.5rem 0 0;
+    padding-top: 0.5rem;
+    border-top: 1px dashed var(--color-border);
+    color: var(--color-text-sub);
+    font-size: var(--font-size-small);
+}
+
 .deepdive-chat__pending {
     margin: 0.5rem 0;
     color: var(--color-text-sub);
