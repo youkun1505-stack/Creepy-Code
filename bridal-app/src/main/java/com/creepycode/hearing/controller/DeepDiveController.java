@@ -1,11 +1,13 @@
 package com.creepycode.hearing.controller;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -14,9 +16,12 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.creepycode.auth.service.LoginUser;
+import com.creepycode.common.ai.AiAttachment;
 import com.creepycode.common.exception.AiException;
 import com.creepycode.hearing.dto.AiChatMessageRequest;
 import com.creepycode.hearing.dto.AiChatMessageView;
@@ -69,8 +74,35 @@ public class DeepDiveController {
     public ResponseEntity<Map<String, Object>> sendMessage(@AuthenticationPrincipal LoginUser loginUser,
             @RequestBody AiChatMessageRequest request, HttpSession session) {
         String content = request == null ? null : request.content();
+        return reply(loginUser.getUserId(), content, null, session);
+    }
+
+    /**
+     * 利用者の発言と、添付ファイル1件（任意）を、multipart/form-data で受けて、AI の返事を JSON で返す。
+     * 形式は JSON の送信と同じ。添付は PNG・JPEG・PDF のみ、1件まで、10MB まで。
+     * 添付の誤り（2件以上・空・種類違い・10MB 超え）は、AI を呼ばず 400 と理由を返す。
+     */
+    @PostMapping(value = "/messages", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> sendMessageWithFile(@AuthenticationPrincipal LoginUser loginUser,
+            @RequestParam(name = "content", required = false) String content,
+            @RequestParam(name = "file", required = false) List<MultipartFile> files, HttpSession session) {
+        AiAttachment attachment;
         try {
-            String reply = aiChatService.sendMessage(loginUser.getUserId(), content);
+            attachment = toAttachment(files);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("ok", false, "message", e.getMessage()));
+        }
+        return reply(loginUser.getUserId(), content, attachment, session);
+    }
+
+    /** AI に発言を渡して、返事を JSON で返す（JSON の送信と添付つきの送信で共通）。 */
+    private ResponseEntity<Map<String, Object>> reply(Long userId, String content, AiAttachment attachment,
+            HttpSession session) {
+        try {
+            // 添付が無いときは、今までと同じ2引数の呼び出しにする
+            String reply = attachment == null ? aiChatService.sendMessage(userId, content)
+                    : aiChatService.sendMessage(userId, content, attachment);
             session.removeAttribute(FAILURE_COUNT);
             return ResponseEntity.ok(Map.of("ok", true, "reply", reply));
         } catch (IllegalArgumentException e) {
@@ -84,6 +116,33 @@ public class DeepDiveController {
                     .body(Map.of("ok", false,
                             "message", "AI の返事を作れませんでした。もう一度お試しください。",
                             "giveUp", failures >= MAX_FAILURES));
+        }
+    }
+
+    /**
+     * 届いたファイルを1件の添付にする。ファイル欄が空（名前が無い）のときは添付なし（null）。
+     * 2件以上・中身を読めないときは IllegalArgumentException を投げる。
+     */
+    private static AiAttachment toAttachment(List<MultipartFile> files) {
+        if (files == null) {
+            return null;
+        }
+        // ファイルを選んでいない欄は、名前も中身も空で届くので数えない
+        List<MultipartFile> chosen = files.stream()
+                .filter(file -> (file.getOriginalFilename() != null && !file.getOriginalFilename().isBlank())
+                        || file.getSize() > 0)
+                .toList();
+        if (chosen.isEmpty()) {
+            return null;
+        }
+        if (chosen.size() > 1) {
+            throw new IllegalArgumentException("添付は1回に1ファイルまでです。");
+        }
+        MultipartFile file = chosen.get(0);
+        try {
+            return new AiAttachment(file.getOriginalFilename(), file.getContentType(), file.getBytes());
+        } catch (IOException e) {
+            throw new IllegalArgumentException("ファイルを読み込めませんでした。もう一度選んでください。");
         }
     }
 }

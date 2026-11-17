@@ -1,31 +1,38 @@
 package com.creepycode.hearing.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -34,6 +41,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 
 import com.creepycode.auth.entity.UserRole;
 import com.creepycode.auth.service.LoginUser;
+import com.creepycode.common.ai.AiAttachment;
 import com.creepycode.common.config.SecurityConfig;
 import com.creepycode.common.exception.AiException;
 import com.creepycode.hearing.dto.AiChatMessageView;
@@ -49,6 +57,9 @@ import com.creepycode.hearing.service.AiChatService;
 class DeepDiveControllerTest {
 
     private static final String PATH = "/hearing/deepdive/messages";
+    // 種類の印（先頭のバイト）だけを持つ、ダミーの中身
+    private static final byte[] PNG_DATA = { (byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2 };
+    private static final byte[] PDF_DATA = { 0x25, 0x50, 0x44, 0x46, 0x2D, 0x31, 0x2E, 0x34 };
     // ログインした顧客（USER_ID は 1）
     private static final LoginUser CUSTOMER =
             new LoginUser(1L, "customer@example.com", null, "テスト 顧客", UserRole.CUSTOMER);
@@ -179,6 +190,114 @@ class DeepDiveControllerTest {
 
         verify(aiChatService).findHistory(42L);
         verify(aiChatService).sendMessage(42L, "質問です");
+    }
+
+    @Test
+    void 画像つきの送信は_文章とファイルを受け取り_返事を200で返す() throws Exception {
+        when(aiChatService.sendMessage(anyLong(), anyString(), any(AiAttachment.class))).thenReturn("写真を見ました。");
+
+        sendMultipart(file("photo.png", "image/png", PNG_DATA), "この会場はどうですか")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ok").value(true))
+                .andExpect(jsonPath("$.reply").value("写真を見ました。"));
+
+        ArgumentCaptor<AiAttachment> sent = ArgumentCaptor.forClass(AiAttachment.class);
+        verify(aiChatService).sendMessage(org.mockito.ArgumentMatchers.eq(1L),
+                org.mockito.ArgumentMatchers.eq("この会場はどうですか"), sent.capture());
+        assertThat(sent.getValue().fileName()).isEqualTo("photo.png");
+        assertThat(sent.getValue().mimeType()).isEqualTo("image/png");
+        assertThat(sent.getValue().data()).isEqualTo(PNG_DATA);
+    }
+
+    @Test
+    void PDFの添付も受け取る() throws Exception {
+        when(aiChatService.sendMessage(anyLong(), anyString(), any(AiAttachment.class))).thenReturn("見積もりを見ました。");
+
+        sendMultipart(file("estimate.pdf", "application/pdf", PDF_DATA), "この見積もりは高いですか")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.reply").value("見積もりを見ました。"));
+
+        ArgumentCaptor<AiAttachment> sent = ArgumentCaptor.forClass(AiAttachment.class);
+        verify(aiChatService).sendMessage(anyLong(), anyString(), sent.capture());
+        assertThat(sent.getValue().mimeType()).isEqualTo("application/pdf");
+    }
+
+    @Test
+    void 添付が無い文章だけのmultipartは_添付なしとして送る() throws Exception {
+        when(aiChatService.sendMessage(anyLong(), anyString())).thenReturn("返事です。");
+
+        mockMvc.perform(multipart(PATH).param("content", "質問です").with(user(CUSTOMER)).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.reply").value("返事です。"));
+
+        // 添付が無いときは、JSON の送信と同じ2引数の呼び出しになる
+        verify(aiChatService).sendMessage(1L, "質問です");
+    }
+
+    @Test
+    void 種類違いの添付は_400と案内の文言を返す() throws Exception {
+        when(aiChatService.sendMessage(anyLong(), anyString(), any(AiAttachment.class)))
+                .thenThrow(new IllegalArgumentException("添付できるのは PNG・JPEG・PDF のファイルだけです。"));
+
+        sendMultipart(file("memo.txt", "text/plain", "hello".getBytes(StandardCharsets.UTF_8)), "質問")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.ok").value(false))
+                .andExpect(jsonPath("$.message").value("添付できるのは PNG・JPEG・PDF のファイルだけです。"));
+    }
+
+    @Test
+    void 大きすぎるファイルは_400と案内の文言を返す() throws Exception {
+        when(aiChatService.sendMessage(anyLong(), anyString(), any(AiAttachment.class)))
+                .thenThrow(new IllegalArgumentException("ファイルは10MB以下にしてください。"));
+
+        sendMultipart(file("big.png", "image/png", new byte[10 * 1024 * 1024 + 1]), "質問")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("ファイルは10MB以下にしてください。"));
+    }
+
+    @Test
+    void ファイルが2件以上のときは_AIを呼ばず400を返す() throws Exception {
+        mockMvc.perform(multipart(PATH)
+                        .file(file("a.png", "image/png", PNG_DATA))
+                        .file(file("b.png", "image/png", PNG_DATA))
+                        .param("content", "質問")
+                        .with(user(CUSTOMER)).with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.ok").value(false))
+                .andExpect(jsonPath("$.message").value("添付は1回に1ファイルまでです。"));
+
+        verify(aiChatService, never()).sendMessage(anyLong(), anyString(), any());
+    }
+
+    @Test
+    void 空のファイルは_AIを呼ばず400を返す() throws Exception {
+        when(aiChatService.sendMessage(anyLong(), anyString(), any(AiAttachment.class)))
+                .thenThrow(new IllegalArgumentException("空のファイルは添付できません。"));
+
+        sendMultipart(file("empty.png", "image/png", new byte[0]), "質問")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("空のファイルは添付できません。"));
+    }
+
+    @Test
+    void 添付つきの送信でAIが失敗したら_502と_giveUpを返す() throws Exception {
+        when(aiChatService.sendMessage(anyLong(), anyString(), any(AiAttachment.class)))
+                .thenThrow(new AiException("時間切れ"));
+
+        sendMultipart(file("photo.png", "image/png", PNG_DATA), "質問")
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.ok").value(false))
+                .andExpect(jsonPath("$.giveUp").value(false));
+    }
+
+    /** 文章とファイル1件を multipart/form-data で送る。 */
+    private ResultActions sendMultipart(MockMultipartFile file, String content) throws Exception {
+        return mockMvc.perform(multipart(PATH).file(file).param("content", content)
+                .with(user(CUSTOMER)).with(csrf()));
+    }
+
+    private static MockMultipartFile file(String name, String mime, byte[] data) {
+        return new MockMultipartFile("file", name, mime, data);
     }
 
     private ResultActions send(String path, String json, MockHttpSession session) throws Exception {
