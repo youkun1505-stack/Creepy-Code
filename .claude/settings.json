@@ -128,8 +128,12 @@
       "Bash(git commit * --no-verify*)",
       "PowerShell(git commit * --no-verify*)",
       "Agent(fork)",
-      "Bash(gh pr merge *)",
-      "PowerShell(gh pr merge *)",
+      "Bash(gh pr merge *--admin*)",
+      "PowerShell(gh pr merge *--admin*)",
+      "Bash(gh pr merge *--delete-branch*)",
+      "PowerShell(gh pr merge *--delete-branch*)",
+      "Bash(gh pr merge * -d*)",
+      "PowerShell(gh pr merge * -d*)",
       "Read(/**/.env)",
       "Read(/**/.env.*)"
     ]
