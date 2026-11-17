@@ -183,11 +183,40 @@ class AiChatServiceTest {
 
         assertThat(service.findAnswerItems(USER_ID)).containsExactly(
                 new HearingAnswerItemView("理想のカップル像", "ナチュラル（やさしい雰囲気）"),
-                new HearingAnswerItemView("好きな雰囲気", "「ナチュラル」が好きなようです　なかでも「和」寄りです"),
+                new HearingAnswerItemView("好きな雰囲気", "「ナチュラル」が好きなようです", List.of("なかでも「和」寄りです")),
                 new HearingAnswerItemView("希望日程", "2027-05-01"),
                 new HearingAnswerItemView("予算", "3,000,000円"),
                 new HearingAnswerItemView("決められないこと", "料理"),
                 new HearingAnswerItemView("こだわりたいこと", "写真・映像"));
+    }
+
+    @Test
+    void 好きな雰囲気の細かい好みは_テイストごとに1件ずつ別の項目に入り_見出しとは分かれる() {
+        OnboardingAnswer answer = answer(1L, LocalDate.of(2027, 5, 1), 3_000_000, "料理", "写真・映像");
+        when(answerRepository.findFirstByUserIdOrderByCreatedAtDesc(USER_ID)).thenReturn(Optional.of(answer));
+        when(visualService.findVisualSummary(USER_ID)).thenReturn(Optional.of(new VisualSummaryView(
+                "「ナチュラル」と「モダン」が好きなようです",
+                List.of(new TasteResult("ナチュラル", "なかでも「和」寄りです"),
+                        new TasteResult("モダン", "「和モダン」寄りです")))));
+
+        HearingAnswerItemView style = service.findAnswerItems(USER_ID).get(1);
+
+        assertThat(style.label()).isEqualTo("好きな雰囲気");
+        assertThat(style.value()).isEqualTo("「ナチュラル」と「モダン」が好きなようです");
+        assertThat(style.details()).containsExactly("なかでも「和」寄りです", "「和モダン」寄りです");
+    }
+
+    @Test
+    void 好きなテイストが無い雰囲気は_特になしで_細かい好みの一覧は空() {
+        OnboardingAnswer answer = answer(1L, LocalDate.of(2027, 5, 1), 3_000_000, "料理", "写真・映像");
+        when(answerRepository.findFirstByUserIdOrderByCreatedAtDesc(USER_ID)).thenReturn(Optional.of(answer));
+        when(visualService.findVisualSummary(USER_ID))
+                .thenReturn(Optional.of(new VisualSummaryView(null, List.of())));
+
+        HearingAnswerItemView style = service.findAnswerItems(USER_ID).get(1);
+
+        assertThat(style).isEqualTo(new HearingAnswerItemView("好きな雰囲気", "特になし"));
+        assertThat(style.details()).isEmpty();
     }
 
     @Test

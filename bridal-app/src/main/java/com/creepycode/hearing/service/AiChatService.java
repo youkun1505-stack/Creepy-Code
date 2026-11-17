@@ -6,7 +6,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
@@ -165,23 +164,23 @@ public class AiChatService {
     }
 
     /**
-     * STEP2 の好きな雰囲気の項目を作る。Step2 をまだ答えていないときは「まだ答えていません」。
+     * STEP2 の好きな雰囲気の項目を作る。見出しの文を value に、テイストごとの細かい好みを details に分けて入れ、
+     * 画面では細かい好みを1件ずつ別の行に出す。Step2 をまだ答えていないときは「まだ答えていません」、
+     * 好きなテイストが無いときは「特になし」。
      */
     private HearingAnswerItemView styleItem(Long userId) {
-        Optional<VisualSummaryView> summary = visualService.findVisualSummary(userId);
-        String value = summary.map(this::describeStyle).orElse("まだ答えていません");
-        return new HearingAnswerItemView("好きな雰囲気", value);
-    }
-
-    /** STEP2 のまとめを1行の文にする。好きなテイストが無ければ「特になし」。 */
-    private String describeStyle(VisualSummaryView summary) {
-        if (summary.isEmpty()) {
-            return "特になし";
+        Optional<VisualSummaryView> found = visualService.findVisualSummary(userId);
+        if (found.isEmpty()) {
+            return new HearingAnswerItemView("好きな雰囲気", "まだ答えていません");
         }
-        String details = summary.tasteResults().stream()
+        VisualSummaryView summary = found.get();
+        if (summary.isEmpty()) {
+            return new HearingAnswerItemView("好きな雰囲気", "特になし");
+        }
+        List<String> details = summary.tasteResults().stream()
                 .map(TasteResult::detailText)
-                .collect(Collectors.joining("　"));
-        return summary.headline() + "　" + details;
+                .toList();
+        return new HearingAnswerItemView("好きな雰囲気", summary.headline(), details);
     }
 
     private String orNone(String value) {

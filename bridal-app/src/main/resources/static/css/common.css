@@ -349,9 +349,15 @@ h3 {
     gap: 1.5rem;
 }
 
+/* 2列になる幅では、AIに相談する画面だけ本文の幅を広げ、チャットの幅を変更前に近く保つ（ほかの画面の .site-main は変えない） */
 @media (min-width: 992px) {
+    .deepdive-page {
+        max-width: 1080px;
+    }
+
     .deepdive-layout {
-        grid-template-columns: minmax(0, 1fr) 18rem;
+        grid-template-columns: minmax(0, 1fr) 16rem;
+        column-gap: 1.25rem;
         align-items: start;
     }
 }
@@ -391,6 +397,12 @@ h3 {
 .deepdive-answers__value {
     margin: 0;
     overflow-wrap: anywhere;
+}
+
+/* 好きな雰囲気のテイストごとの細かい好み（1件ずつ別の行） */
+.deepdive-answers__details {
+    margin: 0.25rem 0 0;
+    padding-left: 1.25rem;
 }
 
 

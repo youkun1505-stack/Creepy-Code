@@ -106,6 +106,21 @@ class DeepDiveControllerTest {
     }
 
     @Test
+    void 好きな雰囲気の細かい好みは_画面で1件ずつ別の行に出す() throws Exception {
+        when(aiChatService.findAnswerItems(1L)).thenReturn(List.of(
+                new HearingAnswerItemView("好きな雰囲気", "「ナチュラル」と「モダン」が好きなようです",
+                        List.of("なかでも「和」寄りです", "「和モダン」寄りです"))));
+
+        mockMvc.perform(get("/hearing/deepdive").with(user(CUSTOMER)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("「ナチュラル」と「モダン」が好きなようです")))
+                .andExpect(content().string(containsString(
+                        "<li class=\"deepdive-answers__detail\">なかでも「和」寄りです</li>")))
+                .andExpect(content().string(containsString(
+                        "<li class=\"deepdive-answers__detail\">「和モダン」寄りです</li>")));
+    }
+
+    @Test
     void かんたん質問に答えていなければ_欄に_まだ答えていません_と出し_エラーにしない() throws Exception {
         when(aiChatService.findAnswerItems(1L)).thenReturn(List.of());
 

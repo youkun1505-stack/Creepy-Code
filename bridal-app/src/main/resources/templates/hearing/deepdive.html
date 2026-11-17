@@ -5,7 +5,7 @@
     <title>AIに相談する</title>
 </head>
 <body>
-    <main class="container site-main" layout:fragment="content">
+    <main class="container site-main deepdive-page" layout:fragment="content">
         <h1 class="page-title">AIに相談する</h1>
         <p class="page-lead">結婚式のことで気になることを、ふつうの言葉で書いて送ってください。</p>
 
@@ -68,7 +68,14 @@
                 <dl class="deepdive-answers__list" th:unless="${#lists.isEmpty(answerItems)}">
                     <div class="deepdive-answers__item" th:each="item : ${answerItems}">
                         <dt class="deepdive-answers__label" th:text="${item.label}">理想のカップル像</dt>
-                        <dd class="deepdive-answers__value" th:text="${item.value}">値</dd>
+                        <dd class="deepdive-answers__value">
+                            <span th:text="${item.value}">値</span>
+                            <!-- 細かい内容は1件ずつ別の行に出す（無い項目は出さない） -->
+                            <ul class="deepdive-answers__details" th:unless="${#lists.isEmpty(item.details)}">
+                                <li class="deepdive-answers__detail" th:each="detail : ${item.details}"
+                                    th:text="${detail}">細かい好み</li>
+                            </ul>
+                        </dd>
                     </div>
                 </dl>
             </aside>
