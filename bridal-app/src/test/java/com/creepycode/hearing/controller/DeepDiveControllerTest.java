@@ -27,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -34,6 +35,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.transaction.CannotCreateTransactionException;
 
 import com.creepycode.auth.entity.UserRole;
 import com.creepycode.auth.service.LoginUser;
@@ -43,6 +45,7 @@ import com.creepycode.hearing.dto.AiChatMessageView;
 import com.creepycode.hearing.dto.HearingAnswerItemView;
 import com.creepycode.hearing.entity.AiChatMessage;
 import com.creepycode.hearing.service.AiChatService;
+import com.creepycode.hearing.service.ChatReply;
 
 /**
  * AI相談チャット（P-10）の Controller のテスト。DB は使わず、Service は偽物にする。
@@ -132,7 +135,7 @@ class DeepDiveControllerTest {
 
     @Test
     void 発言を受けると_AIの返事を200とJSONで返す() throws Exception {
-        when(aiChatService.sendMessage(anyLong(), anyString())).thenReturn("返事です。");
+        when(aiChatService.sendMessage(anyLong(), anyString())).thenReturn(new ChatReply("返事です。", true));
 
         send(PATH, "{\"content\":\"質問です\"}", null)
                 .andExpect(status().isOk())
@@ -186,7 +189,7 @@ class DeepDiveControllerTest {
                 .andExpect(jsonPath("$.giveUp").value(true));
 
         // 成功すると、失敗の数は数え直す
-        doReturn("返事です。").when(aiChatService).sendMessage(anyLong(), anyString());
+        doReturn(new ChatReply("返事です。", true)).when(aiChatService).sendMessage(anyLong(), anyString());
         send(PATH, "{\"content\":\"質問\"}", session).andExpect(status().isOk());
 
         doThrow(new AiException("時間切れ")).when(aiChatService).sendMessage(anyLong(), anyString());
@@ -212,10 +215,67 @@ class DeepDiveControllerTest {
     }
 
     @Test
+    void 返事は作れたが保存できなかったら_200で返事と案内を返し_失敗の回数は変えない() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        doThrow(new AiException("時間切れ")).when(aiChatService).sendMessage(anyLong(), anyString());
+        send(PATH, "{\"content\":\"質問\"}", session).andExpect(jsonPath("$.giveUp").value(false));
+        send(PATH, "{\"content\":\"質問\"}", session).andExpect(jsonPath("$.giveUp").value(false));
+
+        // 保存だけが失敗：返事は出し、案内を添える。失敗の数は増えない（この時点で 2 回のまま）
+        doReturn(new ChatReply("返事です。", false)).when(aiChatService).sendMessage(anyLong(), anyString());
+        send(PATH, "{\"content\":\"質問\"}", session)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ok").value(true))
+                .andExpect(jsonPath("$.reply").value("返事です。"))
+                .andExpect(jsonPath("$.saved").value(false))
+                .andExpect(jsonPath("$.notice").value("この返事は保存できませんでした。画面を読み込み直すと消えます。"));
+
+        // 次の AI の失敗で 3 回目になる（保存の失敗で数え直されていれば、ここは false になる）
+        doThrow(new AiException("時間切れ")).when(aiChatService).sendMessage(anyLong(), anyString());
+        send(PATH, "{\"content\":\"質問\"}", session)
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.giveUp").value(true));
+    }
+
+    @Test
+    void 履歴の読み出しがDBの失敗なら_502と案内を返し_中の例外は出さず_回数に数える() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        doThrow(new DataAccessResourceFailureException("DB 接続の詳細")).when(aiChatService)
+                .sendMessage(anyLong(), anyString());
+
+        send(PATH, "{\"content\":\"質問\"}", session)
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.ok").value(false))
+                .andExpect(jsonPath("$.message").value("相談の履歴を読み込めませんでした。もう一度お試しください。"))
+                .andExpect(jsonPath("$.giveUp").value(false));
+        send(PATH, "{\"content\":\"質問\"}", session).andExpect(jsonPath("$.giveUp").value(false));
+        send(PATH, "{\"content\":\"質問\"}", session)
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.giveUp").value(true));
+    }
+
+    @Test
+    void DBに接続できない履歴の読み出しでも_502と案内を返し_中の例外は出さず_回数に数える() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        doThrow(new CannotCreateTransactionException("Could not open JPA EntityManager for transaction"))
+                .when(aiChatService).sendMessage(anyLong(), anyString());
+
+        send(PATH, "{\"content\":\"質問\"}", session)
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.ok").value(false))
+                .andExpect(jsonPath("$.message").value("相談の履歴を読み込めませんでした。もう一度お試しください。"))
+                .andExpect(jsonPath("$.giveUp").value(false));
+        send(PATH, "{\"content\":\"質問\"}", session).andExpect(jsonPath("$.giveUp").value(false));
+        send(PATH, "{\"content\":\"質問\"}", session)
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.giveUp").value(true));
+    }
+
+    @Test
     void ログイン中の顧客のUSER_IDで_履歴を読み_発言を送る() throws Exception {
         // 以前の仮の USER_ID（1）とは違う番号の顧客でログインし、その番号が使われることを確かめる
         LoginUser other = new LoginUser(42L, "hanako@example.com", null, "山田 花子", UserRole.CUSTOMER);
-        when(aiChatService.sendMessage(anyLong(), anyString())).thenReturn("返事です。");
+        when(aiChatService.sendMessage(anyLong(), anyString())).thenReturn(new ChatReply("返事です。", true));
 
         mockMvc.perform(get("/hearing/deepdive").with(user(other))).andExpect(status().isOk());
         mockMvc.perform(post(PATH).with(user(other)).with(csrf())

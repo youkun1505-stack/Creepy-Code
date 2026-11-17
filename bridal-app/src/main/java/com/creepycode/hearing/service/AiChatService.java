@@ -7,7 +7,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.TransactionException;
 
 import com.creepycode.common.ai.AiClient;
 import com.creepycode.common.ai.ChatTurn;
@@ -28,6 +32,8 @@ import com.creepycode.hearing.repository.OnboardingAnswerRepository;
  */
 @Service
 public class AiChatService {
+
+    private static final Logger log = LoggerFactory.getLogger(AiChatService.class);
 
     /** 発言の長さの上限（字）。画面の入力欄も同じ上限にする。 */
     public static final int MAX_LENGTH = 1000;
@@ -78,13 +84,16 @@ public class AiChatService {
     }
 
     /**
-     * 利用者の発言を受けて、AI の返事を作って保存し、返事を返す。
+     * 利用者の発言を受けて、AI の返事を作って保存し、返事と保存できたかを返す。
      * AI の呼び出しに失敗したときは、発言も返事も保存せず AiException を投げる。
      * 空の発言・1000字を超える発言は IllegalArgumentException を投げる（AI は呼ばない）。
+     * 履歴や回答の読み出しが DB の失敗になったときは、AI を呼ばずに DataAccessException をそのまま投げる。
+     * AI の返事のあとの保存が DB の失敗になったときは、例外を投げず、返事を返して saved を false にする
+     * （画面は返事を出し、保存できなかった旨を添える）。
      * AI を待つあいだ DB 接続を握らないよう、このメソッド全体はトランザクションで包まない。
      * 保存は最後の saveAll の1回だけで、その中で2件がまとめて保存される（両方か、どちらも無しか）。
      */
-    public String sendMessage(Long userId, String rawContent) {
+    public ChatReply sendMessage(Long userId, String rawContent) {
         String content = validate(rawContent);
 
         // 今までのやり取りに、今回の発言を最後に足して AI に渡す
@@ -102,10 +111,18 @@ public class AiChatService {
 
         // 利用者の発言を先に、AI の返事をあとに並べて、1回の saveAll でまとめて保存する（古い順に並ぶように）
         LocalDateTime now = LocalDateTime.now();
-        chatRepository.saveAll(List.of(
-                newMessage(userId, AiChatMessage.ROLE_USER, content, now),
-                newMessage(userId, AiChatMessage.ROLE_AI, replyText, now)));
-        return replyText;
+        try {
+            chatRepository.saveAll(List.of(
+                    newMessage(userId, AiChatMessage.ROLE_USER, content, now),
+                    newMessage(userId, AiChatMessage.ROLE_AI, replyText, now)));
+        } catch (DataAccessException | TransactionException e) {
+            // DB に接続できない・commit に失敗すると TransactionException（Spring のトランザクションの例外）になる。
+            // 返事は作れているので捨てず、保存できなかったことだけを呼び出し元に伝える。原因は最後の引数でスタックトレースに残す
+            log.warn("AI相談の発言と返事を保存できませんでした（返事は画面に出します）：{}：{}",
+                    e.getClass().getName(), e.getMessage(), e);
+            return new ChatReply(replyText, false);
+        }
+        return new ChatReply(replyText, true);
     }
 
     /** 発言を整える（前後の空白を消す）。空・1000字超のときは IllegalArgumentException を投げる。 */
