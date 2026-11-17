@@ -325,6 +325,72 @@ h3 {
     transform: none;
 }
 
+/* 添付ファイルの欄（入力欄の下）。実際の入力は visually に隠した file 欄で行い、ラベルをボタンの見た目にする */
+.deepdive-chat__attach {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.deepdive-chat__file-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.deepdive-chat__attach-button {
+    display: inline-flex;
+    align-items: center;
+    margin: 0;
+    padding: 0.375rem 1.25rem;
+    border: 1px solid var(--color-main-dark);
+    border-radius: 999px;
+    background-color: var(--color-surface);
+    color: var(--color-main-dark);
+    font-size: var(--font-size-small);
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.deepdive-chat__attach-button:hover {
+    background-color: var(--color-main-soft);
+}
+
+.deepdive-chat__file-input:focus-visible + .deepdive-chat__attach-button {
+    outline: 3px solid var(--color-main);
+    outline-offset: 2px;
+}
+
+.deepdive-chat__file-name {
+    color: var(--color-text-sub);
+    font-size: var(--font-size-small);
+    overflow-wrap: anywhere;
+}
+
+.deepdive-chat__file-clear {
+    padding: 0.25rem 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background-color: var(--color-surface);
+    color: var(--color-text-sub);
+    font-size: var(--font-size-small);
+    cursor: pointer;
+}
+
+.deepdive-chat__attach-hint {
+    flex-basis: 100%;
+    margin: 0;
+    color: var(--color-text-sub);
+    font-size: var(--font-size-small);
+}
+
 /* スマホ表示対応（狭い画面でも押しやすく崩れない） */
 @media (max-width: 575.98px) {
     .deepdive-chat__form-footer {

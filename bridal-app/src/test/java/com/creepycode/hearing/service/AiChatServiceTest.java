@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -13,6 +14,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -27,6 +29,7 @@ import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.transaction.TransactionException;
 import org.springframework.transaction.TransactionSystemException;
 
+import com.creepycode.common.ai.AiAttachment;
 import com.creepycode.common.ai.AiClient;
 import com.creepycode.common.ai.ChatTurn;
 import com.creepycode.common.exception.AiException;
@@ -46,6 +49,10 @@ import com.creepycode.hearing.repository.OnboardingAnswerRepository;
 class AiChatServiceTest {
 
     private static final Long USER_ID = 1L;
+    // 種類の印（先頭のバイト）だけを持つ、ダミーの中身
+    private static final byte[] PNG_DATA = { (byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2 };
+    private static final byte[] JPEG_DATA = { (byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 1 };
+    private static final byte[] PDF_DATA = { 0x25, 0x50, 0x44, 0x46, 0x2D, 0x31, 0x2E, 0x34 };
 
     private final AiClient aiClient = mock(AiClient.class);
     private final AiChatMessageRepository chatRepository = mock(AiChatMessageRepository.class);
@@ -408,6 +415,120 @@ class AiChatServiceTest {
 
         assertThat(method.isAnnotationPresent(org.springframework.transaction.annotation.Transactional.class))
                 .isFalse();
+    }
+
+    @Test
+    void 画像の添付は_その回だけAIに渡し_履歴には添付の名前を付けて保存する() {
+        when(aiClient.generateReply(anyString(), anyList(), any(AiAttachment.class))).thenReturn("写真を見ました");
+
+        assertThat(service.sendMessage(USER_ID, "この会場はどうですか", new AiAttachment("photo.png", "image/png", PNG_DATA)).reply())
+                .isEqualTo("写真を見ました");
+
+        ArgumentCaptor<AiAttachment> sent = ArgumentCaptor.forClass(AiAttachment.class);
+        verify(aiClient).generateReply(anyString(), anyList(), sent.capture());
+        assertThat(sent.getValue().fileName()).isEqualTo("photo.png");
+        assertThat(sent.getValue().mimeType()).isEqualTo("image/png");
+        assertThat(sent.getValue().data()).isEqualTo(PNG_DATA);
+
+        List<AiChatMessage> saved = capturedSaves();
+        assertThat(saved).extracting(AiChatMessage::getContent)
+                .containsExactly("この会場はどうですか\n（添付：photo.png）", "写真を見ました");
+    }
+
+    @Test
+    void PDFとJPEGの添付も受け付ける() {
+        when(aiClient.generateReply(anyString(), anyList(), any(AiAttachment.class))).thenReturn("返事");
+
+        service.sendMessage(USER_ID, "見積もり", new AiAttachment("estimate.pdf", "application/pdf", PDF_DATA));
+        service.sendMessage(USER_ID, "写真", new AiAttachment("hall.jpg", "image/jpeg; charset=binary", JPEG_DATA));
+
+        ArgumentCaptor<AiAttachment> sent = ArgumentCaptor.forClass(AiAttachment.class);
+        verify(aiClient, times(2)).generateReply(anyString(), anyList(), sent.capture());
+        assertThat(sent.getAllValues()).extracting(AiAttachment::mimeType)
+                .containsExactly("application/pdf", "image/jpeg");
+    }
+
+    @Test
+    void 添付がnullのときは_今までと同じ2引数で_AIを呼び_添付の印は付けない() {
+        when(aiClient.generateReply(anyString(), anyList())).thenReturn("返事");
+
+        service.sendMessage(USER_ID, "質問", null);
+
+        verify(aiClient, never()).generateReply(anyString(), anyList(), any(AiAttachment.class));
+        assertThat(capturedSaves()).extracting(AiChatMessage::getContent).containsExactly("質問", "返事");
+    }
+
+    @Test
+    void 種類違いの添付は_AIを呼ばず_保存もしない() {
+        // 種類の名前（Content-Type）は PNG だが、中身が文章の場合
+        assertThatThrownBy(() -> service.sendMessage(USER_ID, "質問",
+                new AiAttachment("memo.png", "image/png", "hello".getBytes(StandardCharsets.UTF_8))))
+                .isInstanceOf(IllegalArgumentException.class);
+        // 中身は PNG だが、種類の名前が text/plain の場合
+        assertThatThrownBy(() -> service.sendMessage(USER_ID, "質問",
+                new AiAttachment("photo.txt", "text/plain", PNG_DATA)))
+                .isInstanceOf(IllegalArgumentException.class);
+        // 種類の名前も中身も対応外の場合
+        assertThatThrownBy(() -> service.sendMessage(USER_ID, "質問",
+                new AiAttachment("sheet.xlsx", "application/vnd.ms-excel", new byte[] { 1, 2, 3 })))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(aiClient, never()).generateReply(anyString(), anyList(), any(AiAttachment.class));
+        verify(chatRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    void 空のファイルと_10MBを超えるファイルは_AIを呼ばず弾く() {
+        assertThatThrownBy(() -> service.sendMessage(USER_ID, "質問",
+                new AiAttachment("empty.png", "image/png", new byte[0])))
+                .isInstanceOf(IllegalArgumentException.class);
+        byte[] tooLarge = new byte[AiChatService.MAX_ATTACHMENT_BYTES + 1];
+        System.arraycopy(PNG_DATA, 0, tooLarge, 0, PNG_DATA.length);
+        assertThatThrownBy(() -> service.sendMessage(USER_ID, "質問",
+                new AiAttachment("big.png", "image/png", tooLarge)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("10MB");
+
+        verify(aiClient, never()).generateReply(anyString(), anyList(), any(AiAttachment.class));
+        verify(chatRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    void 文章が空のときは_添付があっても弾き_AIを呼ばない() {
+        assertThatThrownBy(() -> service.sendMessage(USER_ID, "  ", new AiAttachment("photo.png", "image/png", PNG_DATA)))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(aiClient, never()).generateReply(anyString(), anyList(), any(AiAttachment.class));
+        verify(chatRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    void ファイル名は_フォルダの部分を取り除き_長すぎるときは拡張子を残して短くする() {
+        assertThat(AiChatService.displayFileName("C:\\Users\\me\\Desktop\\式場.png")).isEqualTo("式場.png");
+        assertThat(AiChatService.displayFileName("/home/me/a.pdf")).isEqualTo("a.pdf");
+        assertThat(AiChatService.displayFileName("  ")).isEqualTo("添付ファイル");
+        assertThat(AiChatService.displayFileName(null)).isEqualTo("添付ファイル");
+
+        String longName = "あ".repeat(50) + ".pdf";
+        String shortened = AiChatService.displayFileName(longName);
+        assertThat(shortened).endsWith("….pdf");
+        assertThat(shortened.codePointCount(0, shortened.length())).isLessThanOrEqualTo(AiChatService.MAX_FILE_NAME_LENGTH);
+    }
+
+    @Test
+    void 添付つきの発言は_文章の上限1000字を文章だけで数える() {
+        when(aiClient.generateReply(anyString(), anyList(), any(AiAttachment.class))).thenReturn("返事");
+
+        assertThat(service.sendMessage(USER_ID, "あ".repeat(1000), new AiAttachment("a.pdf", "application/pdf", PDF_DATA)).reply())
+                .isEqualTo("返事");
+    }
+
+    /** 保存された発言（2件）を取り出す。 */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    private List<AiChatMessage> capturedSaves() {
+        ArgumentCaptor<List<AiChatMessage>> captor = (ArgumentCaptor) ArgumentCaptor.forClass(List.class);
+        verify(chatRepository, atLeastOnce()).saveAll(captor.capture());
+        return captor.getValue();
     }
 
     /** 事前ヒアリングの回答を作る。archetypeId が空でなければ、そのアーキタイプの名前・説明を偽物で返す。 */

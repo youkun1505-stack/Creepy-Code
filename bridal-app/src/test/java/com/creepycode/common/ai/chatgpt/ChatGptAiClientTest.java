@@ -11,6 +11,7 @@ import java.net.InetSocketAddress;
 import java.net.http.HttpClient;
 import java.nio.file.Path;
 import java.security.SecureRandom;
+import java.util.Base64;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -33,7 +34,9 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 
+import com.creepycode.common.ai.AiAttachment;
 import com.creepycode.common.ai.AiClient;
+import com.creepycode.common.ai.ChatTurn;
 import com.creepycode.common.ai.DummyAiClient;
 import com.creepycode.common.exception.AiException;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -443,6 +446,131 @@ class ChatGptAiClientTest {
                 .hasMessageNotContaining(REFRESH);
         assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(5));
         assertThat(requests).isEmpty();
+    }
+
+    @Test
+    void 添付なしの返事は_今までどおり文字列の本文で送る() throws IOException {
+        signIn(EXPIRES_LATER);
+        responder = exchange -> sseOk(exchange, sse(delta("返事"), completed()));
+        List<ChatTurn> history = List.of(new ChatTurn("USER", "質問です"));
+
+        String reply = client(Duration.ofSeconds(30)).generateReply(INSTRUCTIONS, history, null);
+
+        assertThat(reply).isEqualTo("返事");
+        JsonNode message = JSON.readTree(requests.get(0).body()).path("input").get(0);
+        assertThat(message.path("content").isTextual()).isTrue();
+        assertThat(message.path("content").asText())
+                .isEqualTo(ChatGptAiClient.toInputText(history));
+    }
+
+    @Test
+    void 画像のPNG添付は_input_textと_input_imageを同じuserの本文に並べて送る() throws IOException {
+        signIn(EXPIRES_LATER);
+        responder = exchange -> sseOk(exchange, sse(delta("画像を見ました"), completed()));
+        byte[] png = "PNG-BYTES-\u0001\u0002".getBytes(UTF_8);
+        AiAttachment attachment = new AiAttachment("座席表.png", "image/png", png);
+
+        String reply = client(Duration.ofSeconds(30)).generateReply(INSTRUCTIONS,
+                List.of(new ChatTurn("USER", "この図を見てください")), attachment);
+
+        assertThat(reply).isEqualTo("画像を見ました");
+        assertThat(requests).hasSize(1);
+        JsonNode message = JSON.readTree(requests.get(0).body()).path("input").get(0);
+        assertThat(message.path("role").asText()).isEqualTo("user");
+        JsonNode content = message.path("content");
+        assertThat(content.isArray()).isTrue();
+        assertThat(content.size()).isEqualTo(2);
+        assertThat(content.get(0).path("type").asText()).isEqualTo("input_text");
+        assertThat(content.get(0).path("text").asText()).contains("この図を見てください");
+        assertThat(content.get(1).path("type").asText()).isEqualTo("input_image");
+        String imageUrl = content.get(1).path("image_url").asText();
+        String prefix = "data:image/png;base64,";
+        assertThat(imageUrl).startsWith(prefix);
+        assertThat(Base64.getDecoder().decode(imageUrl.substring(prefix.length()))).isEqualTo(png);
+        // 画像は input_image だけで送り、PDF 用の項目（file_data）は入れない
+        assertThat(content.get(1).has("file_data")).isFalse();
+    }
+
+    @Test
+    void JPEGの添付は_image_jpegのdata_URLで_input_imageにする() throws IOException {
+        signIn(EXPIRES_LATER);
+        responder = exchange -> sseOk(exchange, sse(delta("OK"), completed()));
+        byte[] jpeg = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x00};
+
+        client(Duration.ofSeconds(30)).generateReply(INSTRUCTIONS,
+                List.of(new ChatTurn("USER", "写真です")), new AiAttachment("photo.jpg", "image/jpeg", jpeg));
+
+        JsonNode part = JSON.readTree(requests.get(0).body()).path("input").get(0).path("content").get(1);
+        assertThat(part.path("type").asText()).isEqualTo("input_image");
+        assertThat(part.path("image_url").asText())
+                .startsWith("data:image/jpeg;base64,")
+                .endsWith(Base64.getEncoder().encodeToString(jpeg));
+    }
+
+    @Test
+    void PDFの添付は_input_fileでfilenameとfile_dataのdata_URLを送る() throws IOException {
+        signIn(EXPIRES_LATER);
+        responder = exchange -> sseOk(exchange, sse(delta("PDFを読みました"), completed()));
+        byte[] pdf = "%PDF-1.4 test".getBytes(UTF_8);
+
+        String reply = client(Duration.ofSeconds(30)).generateReply(INSTRUCTIONS,
+                List.of(new ChatTurn("USER", "資料です")), new AiAttachment("予算.pdf", "application/pdf", pdf));
+
+        assertThat(reply).isEqualTo("PDFを読みました");
+        JsonNode content = JSON.readTree(requests.get(0).body()).path("input").get(0).path("content");
+        assertThat(content.size()).isEqualTo(2);
+        assertThat(content.get(0).path("type").asText()).isEqualTo("input_text");
+        JsonNode file = content.get(1);
+        assertThat(file.path("type").asText()).isEqualTo("input_file");
+        assertThat(file.path("filename").asText()).isEqualTo("予算.pdf");
+        String prefix = "data:application/pdf;base64,";
+        assertThat(file.path("file_data").asText()).startsWith(prefix);
+        assertThat(Base64.getDecoder().decode(file.path("file_data").asText().substring(prefix.length())))
+                .isEqualTo(pdf);
+        assertThat(file.has("image_url")).isFalse();
+    }
+
+    @Test
+    void 対応しない種類の添付は_送らずに例外にし_中身のbase64は出さない() throws IOException {
+        signIn(EXPIRES_LATER);
+        responder = exchange -> sseOk(exchange, sse(completed()));
+        byte[] text = "SECRET-TEXT-FILE".getBytes(UTF_8);
+        String encoded = Base64.getEncoder().encodeToString(text);
+
+        assertThatThrownBy(() -> client(Duration.ofSeconds(30)).generateReply(INSTRUCTIONS,
+                List.of(new ChatTurn("USER", "資料です")), new AiAttachment("memo.txt", "text/plain", text)))
+                .isInstanceOf(AiException.class)
+                .hasMessageContaining("PNG・JPEG・PDF")
+                .hasMessageNotContaining(encoded)
+                .hasMessageNotContaining("SECRET-TEXT-FILE");
+        assertThat(requests).isEmpty();
+    }
+
+    @Test
+    void 中身が空の添付は_送らずに例外にする() {
+        signIn(EXPIRES_LATER);
+        responder = exchange -> sseOk(exchange, sse(completed()));
+
+        assertThatThrownBy(() -> client(Duration.ofSeconds(30)).generateReply(INSTRUCTIONS,
+                List.of(new ChatTurn("USER", "資料です")), new AiAttachment("empty.png", "image/png", new byte[0])))
+                .isInstanceOf(AiException.class);
+        assertThat(requests).isEmpty();
+    }
+
+    @Test
+    void 添付の中身はログに出さない() throws IOException {
+        signIn(EXPIRES_LATER);
+        responder = exchange -> sseError(exchange, 400, "{\"error\":{\"code\":\"invalid_image\"}}");
+        byte[] png = "PNG-LOG-CHECK".getBytes(UTF_8);
+        String encoded = Base64.getEncoder().encodeToString(png);
+
+        assertThatThrownBy(() -> client(Duration.ofSeconds(30)).generateReply(INSTRUCTIONS,
+                List.of(new ChatTurn("USER", "画像です")), new AiAttachment("a.png", "image/png", png)))
+                .isInstanceOf(AiException.class);
+
+        assertThat(warnings()).hasSize(1);
+        assertThat(warnings().get(0)).doesNotContain(encoded).doesNotContain("PNG-LOG-CHECK");
+        assertThat(requests).hasSize(1);
     }
 
     /** 更新の接続先も偽サーバーに向けたクライアントを作る（401 のやり直しと期限切れの更新の確認用）。 */

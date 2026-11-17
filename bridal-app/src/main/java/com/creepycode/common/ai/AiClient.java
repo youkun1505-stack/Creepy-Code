@@ -39,4 +39,17 @@ public interface AiClient {
      * @return AI の返事の文章
      */
     String generateReply(String instructions, List<ChatTurn> history);
+
+    /**
+     * それまでのやり取りに加えて、最後の発言に付いた添付ファイルを渡して、AI の返事を作らせる。
+     * 添付は、この呼び出しの1回だけ AI に渡す（保存はしない）。attachment が null のときは、添付なしの
+     * generateReply(instructions, history) と同じ返事になる。
+     * 対応しない種類の添付は、AI に送らずに AiException を投げる。失敗したときも AiException を投げる。
+     *
+     * @param instructions AI への指示（役割や出力の形式）
+     * @param history      やり取りの発言（古い順。最後が利用者の質問）
+     * @param attachment   最後の発言に付いた添付（無いときは null）
+     * @return AI の返事の文章
+     */
+    String generateReply(String instructions, List<ChatTurn> history, AiAttachment attachment);
 }

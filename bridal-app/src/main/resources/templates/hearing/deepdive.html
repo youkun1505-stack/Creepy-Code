@@ -48,6 +48,15 @@
                   th:data-send-url="@{/hearing/deepdive/messages}">
                 <label class="form-label" for="chatInput">相談の内容</label>
                 <textarea class="form-control" id="chatInput" rows="3" th:maxlength="${maxChatLength}"></textarea>
+                <!-- 添付（任意）：画像（PNG・JPEG）か PDF を1つ。保存はせず、この1回の相談にだけ使う -->
+                <div class="deepdive-chat__attach">
+                    <input type="file" class="deepdive-chat__file-input" id="chatFile"
+                           accept="image/png,image/jpeg,application/pdf" aria-describedby="chatFileHint">
+                    <label class="deepdive-chat__attach-button" for="chatFile">ファイルを選ぶ</label>
+                    <span class="deepdive-chat__file-name" id="chatFileName" aria-live="polite">選ばれていません</span>
+                    <button type="button" class="deepdive-chat__file-clear d-none" id="chatFileClear">添付を取り消す</button>
+                    <p class="deepdive-chat__attach-hint" id="chatFileHint">PNG・JPEG・PDF のどれか1つを、10MB まで添付できます。添付したファイルは保存されません。</p>
+                </div>
                 <div class="deepdive-chat__form-footer">
                     <div class="deepdive-chat__meta">
                         <span class="deepdive-chat__shortcut">Ctrl + Enter で送信</span>

@@ -13,6 +13,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.TransactionException;
 
+import com.creepycode.common.ai.AiAttachment;
 import com.creepycode.common.ai.AiClient;
 import com.creepycode.common.ai.ChatTurn;
 import com.creepycode.common.exception.AiException;
@@ -43,6 +44,20 @@ public class AiChatService {
 
     /** AI に渡す過去の発言の本文の合計字数の上限（字数は文字（コードポイント）で数える）。 */
     static final int MAX_HISTORY_CHARS = 8000;
+
+    /** 添付ファイル1件の上限（バイト）。10MB。 */
+    public static final int MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+
+    /** 添付ファイル名を履歴に残すときの、字数の上限（拡張子を含む）。 */
+    static final int MAX_FILE_NAME_LENGTH = 30;
+
+    private static final String MIME_PNG = "image/png";
+    private static final String MIME_JPEG = "image/jpeg";
+    private static final String MIME_PDF = "application/pdf";
+    // 先頭のバイト（ファイルの中身の印）。PNG・JPEG・PDF だけを受け付ける
+    private static final int[] PNG_HEAD = { 0x89, 0x50, 0x4E, 0x47 };
+    private static final int[] JPEG_HEAD = { 0xFF, 0xD8, 0xFF };
+    private static final int[] PDF_HEAD = { 0x25, 0x50, 0x44, 0x46 };
 
     private static final String INSTRUCTIONS = """
             あなたは結婚式場のプランナーの助手です。
@@ -100,7 +115,19 @@ public class AiChatService {
      * 保存は最後の saveAll の1回だけで、その中で2件がまとめて保存される（両方か、どちらも無しか）。
      */
     public ChatReply sendMessage(Long userId, String rawContent) {
+        return sendMessage(userId, rawContent, null);
+    }
+
+    /**
+     * 利用者の発言と、任意の添付ファイル1件（null で添付なし）を受けて、AI の返事を作って保存し、返事と保存できたかを返す。
+     * 添付は、この回だけ AI に渡し、保存しない。履歴の発言の文章には「（添付：ファイル名）」を付ける。
+     * 添付の種類（PNG・JPEG・PDF）・大きさ（10MB まで）・空でないことは、AI を呼ぶ前に確かめる。
+     * 確かめに通らないときは AI は呼ばず IllegalArgumentException を投げる（発言の確かめも同じ）。
+     * 保存の失敗の扱いは、2引数の sendMessage と同じ（返事を返して saved を false にする）。
+     */
+    public ChatReply sendMessage(Long userId, String rawContent, AiAttachment attachment) {
         String content = validate(rawContent);
+        AiAttachment checked = attachment == null ? null : checkAttachment(attachment);
 
         // 今までのやり取りのうち、件数と字数の上限に収まる新しいほうの分だけを渡し、今回の発言を最後に足す
         List<ChatTurn> past = new ArrayList<>();
@@ -110,17 +137,24 @@ public class AiChatService {
         List<ChatTurn> turns = new ArrayList<>(limitHistory(past));
         turns.add(new ChatTurn(AiChatMessage.ROLE_USER, content));
 
-        String reply = aiClient.generateReply(buildInstructions(userId), turns);
+        String instructions = buildInstructions(userId);
+        // 添付が無いときは、今までと同じ2引数の呼び出しにする
+        String reply = checked == null ? aiClient.generateReply(instructions, turns)
+                : aiClient.generateReply(instructions, turns, checked);
         if (reply == null || reply.isBlank()) {
             throw new AiException("AI の返事が空でした。");
         }
         String replyText = reply.strip();
 
+        // 履歴には、添付があれば添付のファイル名を付けた発言を残す（中身は残さない）
+        String savedContent = checked == null ? content
+                : content + "\n（添付：" + checked.fileName() + "）";
+
         // 利用者の発言を先に、AI の返事をあとに並べて、1回の saveAll でまとめて保存する（古い順に並ぶように）
         LocalDateTime now = LocalDateTime.now();
         try {
             chatRepository.saveAll(List.of(
-                    newMessage(userId, AiChatMessage.ROLE_USER, content, now),
+                    newMessage(userId, AiChatMessage.ROLE_USER, savedContent, now),
                     newMessage(userId, AiChatMessage.ROLE_AI, replyText, now)));
         } catch (DataAccessException | TransactionException e) {
             // DB に接続できない・commit に失敗すると TransactionException（Spring のトランザクションの例外）になる。
@@ -130,6 +164,63 @@ public class AiChatService {
             return new ChatReply(replyText, false);
         }
         return new ChatReply(replyText, true);
+    }
+
+    /**
+     * 添付ファイルを確かめて、AI に渡す形（ファイル名は表示用に整えたもの、種類は小文字の MIME）にして返す。
+     * 種類は届いた Content-Type と先頭のバイトの両方で確かめる。
+     * 種類違い・空・10MB 超えは IllegalArgumentException を投げる。
+     */
+    static AiAttachment checkAttachment(AiAttachment attachment) {
+        byte[] data = attachment.data();
+        if (data == null || data.length == 0) {
+            throw new IllegalArgumentException("空のファイルは添付できません。");
+        }
+        if (data.length > MAX_ATTACHMENT_BYTES) {
+            throw new IllegalArgumentException("ファイルは10MB以下にしてください。");
+        }
+        String mime = attachment.mimeType() == null ? ""
+                : attachment.mimeType().split(";")[0].strip().toLowerCase(Locale.ROOT);
+        boolean matches = switch (mime) {
+            case MIME_PNG -> startsWith(data, PNG_HEAD);
+            case MIME_JPEG -> startsWith(data, JPEG_HEAD);
+            case MIME_PDF -> startsWith(data, PDF_HEAD);
+            default -> false;
+        };
+        if (!matches) {
+            throw new IllegalArgumentException("添付できるのは PNG・JPEG・PDF のファイルだけです。");
+        }
+        return new AiAttachment(displayFileName(attachment.fileName()), mime, data);
+    }
+
+    /** ファイル名から、フォルダの部分を取り除き、長すぎるときは短くする（拡張子は残す）。 */
+    static String displayFileName(String rawName) {
+        String name = rawName == null ? "" : rawName.replace('\\', '/');
+        name = name.substring(name.lastIndexOf('/') + 1).strip();
+        if (name.isEmpty()) {
+            return "添付ファイル";
+        }
+        if (name.codePointCount(0, name.length()) <= MAX_FILE_NAME_LENGTH) {
+            return name;
+        }
+        // 拡張子（短いもの）は残し、前の部分を「…」で縮める
+        int dot = name.lastIndexOf('.');
+        String extension = dot > 0 && name.length() - dot <= 10 ? name.substring(dot) : "";
+        int keep = MAX_FILE_NAME_LENGTH - extension.length() - 1;
+        String head = name.substring(0, name.offsetByCodePoints(0, keep));
+        return head + "…" + extension;
+    }
+
+    private static boolean startsWith(byte[] data, int[] head) {
+        if (data.length < head.length) {
+            return false;
+        }
+        for (int i = 0; i < head.length; i++) {
+            if ((data[i] & 0xFF) != head[i]) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** 発言を整える（前後の空白を消す）。空・1000字超のときは IllegalArgumentException を投げる。 */
