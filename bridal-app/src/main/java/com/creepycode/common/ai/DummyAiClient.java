@@ -40,4 +40,10 @@ public class DummyAiClient implements AiClient {
     public String generateReply(String instructions, List<ChatTurn> history) {
         return DUMMY_CHAT_RESPONSE;
     }
+
+    /** 添付の種類や中身にかかわらず、失敗させずに固定の返事を返す（ダミーでは添付も AI に送らない）。 */
+    @Override
+    public String generateReply(String instructions, List<ChatTurn> history, AiAttachment attachment) {
+        return DUMMY_CHAT_RESPONSE;
+    }
 }

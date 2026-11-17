@@ -14,8 +14,10 @@ import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
@@ -30,6 +32,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+import com.creepycode.common.ai.AiAttachment;
 import com.creepycode.common.ai.AiClient;
 import com.creepycode.common.ai.ChatTurn;
 import com.creepycode.common.exception.AiException;
@@ -113,6 +116,53 @@ public class ChatGptAiClient implements AiClient {
         return generate(instructions, toInputText(history));
     }
 
+    /**
+     * 添付がないときは generateReply と同じ本文（content は文字列）にする。
+     * 添付があるときは、content を「やり取りの文章（input_text）＋添付（input_image または input_file）」の配列にして、
+     * 1つの user メッセージに並べて渡す。対応しない種類は、送らずに AiException にする（添付の中身は文言に出さない）。
+     */
+    @Override
+    public String generateReply(String instructions, List<ChatTurn> history, AiAttachment attachment) {
+        String text = toInputText(history);
+        if (attachment == null) {
+            return generate(instructions, text);
+        }
+        List<Map<String, Object>> content = attachmentContent(text, attachment);
+        return generateWithContent(instructions, content, timeout);
+    }
+
+    /**
+     * 文章と添付を、Responses API の user メッセージの content（配列）にする。
+     * 画像（PNG・JPEG）は input_image、PDF は input_file。中身は base64 にして data URL で渡す。
+     */
+    static List<Map<String, Object>> attachmentContent(String text, AiAttachment attachment) {
+        String mime = attachment.mimeType() == null ? "" : attachment.mimeType().trim().toLowerCase(Locale.ROOT);
+        if (attachment.data() == null || attachment.data().length == 0) {
+            throw new AiException("添付のファイルが空のため、AI に渡せませんでした。");
+        }
+        String encoded = Base64.getEncoder().encodeToString(attachment.data());
+        Map<String, Object> textPart = new LinkedHashMap<>();
+        textPart.put("type", "input_text");
+        textPart.put("text", text);
+
+        Map<String, Object> filePart = new LinkedHashMap<>();
+        switch (mime) {
+            case "image/png", "image/jpeg" -> {
+                filePart.put("type", "input_image");
+                filePart.put("image_url", "data:" + mime + ";base64," + encoded);
+            }
+            case "application/pdf" -> {
+                String name = attachment.fileName() == null || attachment.fileName().isBlank()
+                        ? "file.pdf" : attachment.fileName();
+                filePart.put("type", "input_file");
+                filePart.put("filename", name);
+                filePart.put("file_data", "data:application/pdf;base64," + encoded);
+            }
+            default -> throw new AiException("この種類のファイルは AI に渡せません（PNG・JPEG・PDF のみ対応しています）。");
+        }
+        return List.of(textPart, filePart);
+    }
+
     /** やり取りを、古い順に「利用者：」「AI：」の行として並べた文章にする。 */
     public static String toInputText(List<ChatTurn> history) {
         StringBuilder text = new StringBuilder("これまでのやり取り（古い順）：\n");
@@ -139,8 +189,16 @@ public class ChatGptAiClient implements AiClient {
      */
     @Override
     public String generate(String instructions, String input, Duration limit) {
+        return generateWithContent(instructions, input, limit);
+    }
+
+    /**
+     * generate の本体。content は、文字列（添付なし）か、input_text・input_image などの配列（添付つき）。
+     * 送る形と制限時間の扱いは、どちらの場合も同じ。
+     */
+    private String generateWithContent(String instructions, Object content, Duration limit) {
         long deadline = System.nanoTime() + limit.toNanos();
-        String body = requestBody(instructions, input);
+        String body = requestBody(instructions, content);
         ChatGptCredentials credentials = tokens.usable(remaining(deadline));
         try {
             return send(credentials, body, deadline);
@@ -201,11 +259,12 @@ public class ChatGptAiClient implements AiClient {
     /**
      * 送る本文（JSON）。store:false を毎回送り、送ってはいけない項目（temperature など）は入れない。
      * input は公式の指定どおり配列にし、役割が user のメッセージを1つだけ入れる。
+     * content は文字列（添付なし）か、入力の部品の配列（添付つき）。
      */
-    private String requestBody(String instructions, String input) {
+    private String requestBody(String instructions, Object content) {
         Map<String, Object> message = new LinkedHashMap<>();
         message.put("role", "user");
-        message.put("content", input);
+        message.put("content", content);
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", model);
