@@ -7,7 +7,7 @@ Claude Code（Claude デスクトップアプリの「Code」や、VS Code な�
 | ファイル | 役割 |
 | --- | --- |
 | `AGENTS.md`（リポジトリ直下） | すべての AI が守るルール。Codex はこれを直接読む |
-| `.claude/CLAUDE.md` | Claude Code 用の進め方（`AGENTS.md` を読み込んだうえで、役割の分け方を足したもの） |
+| `.claude/CLAUDE.md` | Claude Code 用の入り口（`AGENTS.md` を読み込み、司会役は `moderator` スキル、役は `.claude/agents/` の定義ファイルに従うことだけを書いたもの） |
 | `.claude/agents/` | Claude Code の役（調査役・設計役・実装役・テスト役・レビュー役・GitHub 係・記録係・文脈係・ハーネス点検）。役ごとのモデルと推論の強さも書いてある |
 | `.claude/settings.json` | 司会役のモデル、Claude Code にさせない操作（取り込みなど）、毎回確認する操作、フック |
 | `.codex/agents/implementer.toml`・`reviewer.toml` | Codex の実装役（軽いモデル）とレビュー役（賢いモデル） |
