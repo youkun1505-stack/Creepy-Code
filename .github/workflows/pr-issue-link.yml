@@ -1,0 +1,55 @@
+# develop 向けの PR が issue に紐づいているかを確かめる。
+# 紐づけは、本文の「Closes #番号」（GitHub が認めたもの）か、「issue なし：理由」のどちらか。
+# チェック名は pr-issue-link。取り込みに必要なチェックにはまだしていない（ブランチの保護は変えない）。
+name: pr-issue-link
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+    branches: [develop]
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+jobs:
+  pr-issue-link:
+    name: pr-issue-link
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: PR と issue の紐づけを確かめる
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -eu
+          # 本文はシェルに直接埋め込まず、gh で読んで変数に入れる。
+          info=$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json closingIssuesReferences,body)
+          linked=$(printf '%s' "$info" | jq '.closingIssuesReferences | length')
+          body=$(printf '%s' "$info" | jq -r '.body // ""')
+
+          if [ "$linked" -ge 1 ]; then
+            echo "OK: 「Closes #番号」で issue に紐づいています（$linked 件）。"
+            exit 0
+          fi
+
+          # 「issue なし」に続けて全角「：」か半角「:」があり、その後ろに空白以外の文字が1つ以上あるか。
+          # 全角の空白は半角に直してから数える。
+          reasons=$(printf '%s\n' "$body" \
+            | sed -n -E 's/.*issue なし(：|:)//p' \
+            | sed 's/　/ /g; s/\r$//' \
+            | grep -c '[^[:space:]]' || true)
+          if [ "$reasons" -ge 1 ]; then
+            echo "OK: 「issue なし」と理由が本文に書かれています。"
+            exit 0
+          fi
+
+          echo "::error::PR の本文に issue との紐づけが見つからないため、この確認を失敗にしました。"
+          echo "次のどちらかを PR の本文に書いてください。"
+          echo "  1. 作業の対象の issue がある場合：「Closes #番号」と書く（番号は issue の番号。例：Closes #12 の 12 の部分）。取り込まれると、その issue は自動で閉じます。"
+          echo "  2. issue が無い場合：「issue なし」の直後に全角のコロン「：」を付け、理由を書く（例：issue なし：文書の誤字を直すだけのため）。"
+          echo "本文を直した直後は、GitHub 側の反映が遅れてこの確認が古い内容で失敗することがあります。"
+          echo "その場合は、少し待ってから、この失敗したチェックの「Re-run jobs」で再実行してください。"
+          exit 1
