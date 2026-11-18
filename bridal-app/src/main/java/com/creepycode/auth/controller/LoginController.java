@@ -1,5 +1,6 @@
 package com.creepycode.auth.controller;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -110,6 +111,10 @@ public class LoginController {
             return "redirect:" + loginService.homeUrl(currentUser.getRole());
         }
         if (bindingResult.hasErrors()) {
+            return showAgain(loginForm, model);
+        }
+        if (loginForm.getPassword().getBytes(StandardCharsets.UTF_8).length > 72) {
+            bindingResult.rejectValue("password", "Size", "パスワードはUTF-8換算で72バイト以内で入力してください");
             return showAgain(loginForm, model);
         }
 
