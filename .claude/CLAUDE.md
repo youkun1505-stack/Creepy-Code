@@ -27,8 +27,10 @@
 | `memory-manager`（記録係） | `.claude/agents/memory-manager.md` | claude-haiku-5-5／medium | 読む・`.agent-memory/` だけ書く | なし |
 | `context-manager`（文脈係） | `.claude/agents/context-manager.md` | claude-haiku-5-5／medium | 読む（変更しない） | explorer |
 | `harness-optimizer`（ハーネス点検） | `.claude/agents/harness-optimizer.md` | claude-haiku-5-5／high | 読む（変更しない） | なし |
+| `administrator`（判断代行役） | `.claude/agents/administrator.md` | claude-sonnet-5-5／high | 読む・`git` の読むだけの操作（変更しない） | なし |
 
-- モデルは、司会役が Opus 5.5、設計役・レビュー役が Sonnet 5.5、ほかの役が Haiku 5.5。定義ファイルと `settings.json` には正式な名前（`claude-opus-5-5`・`claude-sonnet-5-5`・`claude-haiku-5-5`）で書き、
+- 判断代行役（`administrator`）は、司会役より上の立場でリーダーの判断を代わりに行う。司会役は、メンバーに承認や判断を求める前に判断代行役を呼ぶ（`moderator` スキルの「判断代行役に聞く」）。
+- モデルは、司会役が Opus 5.5、設計役・レビュー役・判断代行役が Sonnet 5.5、ほかの役が Haiku 5.5。定義ファイルと `settings.json` には正式な名前（`claude-opus-5-5`・`claude-sonnet-5-5`・`claude-haiku-5-5`）で書き、
   新しいモデルが出ても勝手に変わらないようにしている。略した名前（`opus`・`sonnet`・`haiku`）も、`settings.json` の `env`
   （`ANTHROPIC_DEFAULT_OPUS_MODEL` など）で 5.5 に固定している（公式の説明ではそうなる。実際に効くかは、ハーネス検証記録で未確認）。モデルを新しくするときは、この3か所をリーダーがそろえて書き換える。
   推論の強さは、決まった手順の短い作業が `low`、ふつうの作業が `medium`、長い作業・厳しく守らせたい作業が `high`。
@@ -52,6 +54,6 @@
 | Git のフック | `.githooks/` | `main` へのコミット、`main`・`develop` への送信、feature/・fix/・docs/ で始まらない作業ブランチの送信、強制送信、GitHub のブランチ削除 |
 | Claude Code のフック | `.claude/settings.json` の `hooks` | 開いたときに Git のフックを有効にする。`main`・`develop`・`release/*`・`hotfix/*` の上でのファイル変更。返事を終える前に、`bridal-app/src` に変更があればテストを実行し、失敗したら差し戻す（`.claude/hooks/test-bridal-app.sh`）。同じ変更で通った印（`.claude/.last-test-pass`）があれば、もう一度は実行しない |
 | 役の道具の制限 | `.claude/agents/*.md` の `tools`・`disallowedTools` | 変更しない役の Edit・Write。ほかの役を呼ぶ必要のない役（調査役・テスト役など）の Agent。Bash での書き込み、記録係が書く場所、呼んでよい役の種類は、指示で守る決まり（仕組みでは止まらない） |
-| 許可の設定 | `.claude/settings.json` の `permissions` | 付け替え・`reset --hard`・`--no-verify`・PR の取り込みなどのコマンド、会話を引き継ぐ呼び出し（`Agent(fork)`）。送信・PR 作成・`develop` の取り込みは毎回メンバーに確認 |
+| 許可の設定 | `.claude/settings.json` の `permissions` | 付け替え・`reset --hard`・`--no-verify`・PR の取り込みなどのコマンド、会話を引き継ぐ呼び出し（`Agent(fork)`）。確認を出す設定（`ask`）は置いていない（送信・PR 作成・`develop` の取り込みの判断は判断代行役が行う） |
 
 フックや設定で止められたら、理由をメンバーに伝え、AGENTS.md の Git のルールに沿って直す。止められなかった場合でも、ルールは必ず守る。

@@ -84,6 +84,12 @@
                     <p class="top-next__text" th:text="${nextAction.text()}">説明</p>
                     <a class="btn top-button top-button--primary" th:href="@{${nextAction.url()}}"
                        th:text="${nextAction.buttonLabel()}">はじめる</a>
+                    <!-- STEP をやり直して回答が変わったときだけ：作り直しの案内とボタン -->
+                    <div class="top-next__changed" th:if="${nextAction.notice()}" role="status">
+                        <p class="top-next__changed-text" th:text="${nextAction.notice()}">回答が変わっています。</p>
+                        <a class="btn top-button top-button--secondary" th:href="@{${nextAction.secondaryUrl()}}"
+                           th:text="${nextAction.secondaryLabel()}">作り直す</a>
+                    </div>
                     <!-- TODO: 画面番号と URL の対応表が決まったら、P-10 の URL も Controller の定数（URL_DEEPDIVE）を Model で渡して使う形にそろえる（しょたこん） -->
                     <p class="top-next__ai">迷ったときは、<a class="top-next__ai-link" th:href="@{/hearing/deepdive}">AIに相談する</a>こともできます。かんたん質問の途中でも使えます。</p>
                     <div class="top-hero__rings" aria-hidden="true"></div>

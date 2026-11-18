@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ja" xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{common/layout}">
+<head>
+    <title>好きな雰囲気は？</title>
+    <link rel="stylesheet" th:href="@{/css/hearing.css}">
+</head>
+<body>
+    <!-- かんたん質問 STEP2（P-07）。2段階で好みを聞く（設計書の「スワイプ形式」を PC 向けにしたもの）
+         1回目：テイストごとに1枚を、1枚ずつ「好き」「ちがう」で選ぶ
+         2回目：1回目で「好き」のテイストだけ、細かいテイスト2つを並べて「どちらが近い？」と聞く
+         出し分けは hearing.js が行う。JS が動かないときは、全部の画像をチェックボックス付きの一覧で出し、そのまま送れる -->
+    <main layout:fragment="content" class="container hearing-page">
+
+        <nav th:replace="~{common/hearing-progress :: progress}"></nav>
+
+        <h1 class="hearing-title">好きな雰囲気は？</h1>
+        <!-- STEP2 は直感で選ぶ欄なので、説明は軽く -->
+        <p class="hearing-lead">
+            直感で「好き」「ちがう」を選んでください。<br>
+            会場や予算に合うかは、あとで合わせられます。
+        </p>
+
+        <!-- data-visual-swipe：1回目・2回目を1画面ずつの表示に切り替える（hearing.js） -->
+        <form class="hearing-visual" th:action="@{/hearing/step2}" method="post" data-visual-swipe>
+
+            <p class="hearing-lead" th:if="${#lists.isEmpty(visualQuestions)}">
+                写真を準備中です。このまま次へ進めます。
+            </p>
+
+            <!-- JS が動くときだけ出す：いまどこか（「3 / 6枚」「掘り下げ 1 / 2」。文字は hearing.js が入れる） -->
+            <p class="hearing-visual__counter" aria-live="polite" data-visual-controls data-visual-counter hidden></p>
+
+            <!-- 1回目：テイストごとに1枚。画像の下には種類（式場・衣装・装飾）だけを出し、テイスト名は出さない -->
+            <section class="hearing-visual__round" aria-labelledby="visualRound1Title">
+                <h2 class="hearing-visual__round-title" id="visualRound1Title">1回目：好きな雰囲気を選ぶ</h2>
+                <ol class="hearing-visual__list">
+                    <li class="hearing-visual__item" th:each="question, stat : ${visualQuestions}" data-visual-item
+                        th:attr="data-taste=${question.tasteKey()}">
+                        <label class="hearing-visual__label">
+                            <img class="hearing-visual__image" th:src="@{${question.baseImage().imageUrl()}}"
+                                 th:alt="${question.baseImage().categoryLabel() + 'の写真（' + stat.count + '枚目）'}"
+                                 alt="" width="800" height="600">
+                            <span class="hearing-visual__caption">
+                                <input type="checkbox" class="hearing-visual__check" name="liked"
+                                       th:value="${question.baseImage().imageId()}">
+                                <span class="hearing-visual__category"
+                                      th:text="${question.baseImage().categoryLabel()}">式場</span>
+                            </span>
+                        </label>
+                    </li>
+                </ol>
+            </section>
+
+            <!-- JS が動くときだけ出す：1回目の 好き／ちがう（キーボードの ← → でも選べる） -->
+            <div class="hearing-visual__choices" data-visual-controls data-visual-round1-controls hidden>
+                <button type="button" class="btn hearing-button hearing-button--secondary hearing-visual__skip"
+                        data-visual-skip>← ちがう</button>
+                <button type="button" class="btn hearing-button hearing-button--primary hearing-visual__like"
+                        data-visual-like>好き →</button>
+            </div>
+
+            <!-- 2回目：好きなテイストの掘り下げ。JS が動くときは、1回目で「好き」を選んだテイストの組だけを出す -->
+            <section class="hearing-visual__round" aria-labelledby="visualRound2Title">
+                <h2 class="hearing-visual__round-title" id="visualRound2Title">2回目：好きな雰囲気を掘り下げる</h2>
+                <p class="hearing-visual__round-lead">それぞれ、好きなものに印を付けてください（どちらも・どちらも付けなくても大丈夫です）。</p>
+                <ol class="hearing-visual__pairs">
+                    <li class="hearing-visual__pair" th:each="question : ${visualQuestions}"
+                        th:if="${question.hasPair()}"
+                        data-visual-pair th:attr="data-taste=${question.tasteKey()}">
+                        <p class="hearing-visual__pair-title"
+                           th:text="${'「' + question.tasteLabel() + '」のなかで、どちらが近い？'}">「和」のなかで、どちらが近い？</p>
+                        <div class="hearing-visual__pair-images">
+                            <label class="hearing-visual__label hearing-visual__pair-option" data-pair-option="left">
+                                <img class="hearing-visual__image" th:src="@{${question.leftImage().imageUrl()}}"
+                                     th:alt="${question.leftImage().categoryLabel() + 'の写真（左）'}" alt=""
+                                     width="800" height="600">
+                                <span class="hearing-visual__caption">
+                                    <input type="checkbox" class="hearing-visual__check" name="liked"
+                                           th:value="${question.leftImage().imageId()}" data-pair-side="left">
+                                    <span class="hearing-visual__category">左</span>
+                                </span>
+                            </label>
+                            <label class="hearing-visual__label hearing-visual__pair-option" data-pair-option="right">
+                                <img class="hearing-visual__image" th:src="@{${question.rightImage().imageUrl()}}"
+                                     th:alt="${question.rightImage().categoryLabel() + 'の写真（右）'}" alt=""
+                                     width="800" height="600">
+                                <span class="hearing-visual__caption">
+                                    <input type="checkbox" class="hearing-visual__check" name="liked"
+                                           th:value="${question.rightImage().imageId()}" data-pair-side="right">
+                                    <span class="hearing-visual__category">右</span>
+                                </span>
+                            </label>
+                        </div>
+                        <!-- JS が動くときだけ出す：画像を押すか ← → で左・右を選ぶ。どちらも好き／どちらもちがう はボタンで -->
+                        <div class="hearing-visual__pair-choices" data-visual-controls hidden>
+                            <button type="button" class="btn hearing-button hearing-button--secondary"
+                                    data-pair-pick="both">どちらも好き</button>
+                            <button type="button" class="btn hearing-button hearing-button--secondary"
+                                    data-pair-pick="none">どちらもちがう</button>
+                        </div>
+                    </li>
+                </ol>
+            </section>
+
+            <p class="hearing-visual__hint" data-visual-controls hidden>キーボードの ← → でも選べます。</p>
+
+            <div class="hearing-actions">
+                <a class="btn hearing-button hearing-button--secondary" th:href="@{/hearing/step1}">STEP1 に戻る</a>
+                <!-- JS が動くときだけ出す：ひとつ前に戻って、選び直す（2回目から1回目にも戻れる） -->
+                <button type="button" class="btn hearing-text-button" data-visual-back data-visual-controls
+                        hidden>1つ戻る</button>
+                <!-- JS が動かないときだけ出す（JS が動くときは、最後の画面で選ぶと自動で送る） -->
+                <button type="submit" class="btn hearing-button hearing-button--primary"
+                        data-visual-submit>選び終わった</button>
+            </div>
+        </form>
+
+    </main>
+
+    <th:block layout:fragment="scripts">
+        <script th:src="@{/js/hearing.js}"></script>
+    </th:block>
+</body>
+</html>

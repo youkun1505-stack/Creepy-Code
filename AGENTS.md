@@ -6,7 +6,7 @@ Codex はこのファイルを直接読みます。Claude Code は `.claude/CLAU
 
 ## 1. プロジェクト
 
-- AIブライダルプランニング支援システム（チーム名：Creepy Code）。アプリ本体は `bridal-app/`（Java 17 / Spring Boot 3.5 / Maven / Thymeleaf / Oracle）。
+- AIブライダルプランニング支援システム（チーム名：Creepy Code）。アプリ本体は `bridal-app/`（Java 17 / Spring Boot 3.5 / Maven / Thymeleaf / PostgreSQL）。
 - 命名・パッケージ構成・書き方は `docs/04_開発ルール/コーディング規約.md` に従う。
 - Spring の実装順：テーブル確認 → Entity → Repository → Service → Controller → 画面 → 動作確認。
 - 確認用のテスト：`bridal-app` フォルダで `mvnw.cmd -q test`（Windows）。テストがまだ無い機能は「確認できていない」と正直に書く。
@@ -47,6 +47,7 @@ Codex はこのファイルを直接読みます。Claude Code は `.claude/CLAU
 | GitHub 係 | ブランチ・PR・チェックの状態を調べ、PR の本文を下書きする | 送信・PR 作成・取り込みをしない（司会役が「はい」をもらって行う） |
 | 記録係 | メンバーが残すと決めた内容を、チームの長期記憶（「9.」）に書く | `.agent-memory/` の外を変更しない |
 | 文脈係 | 役に渡す情報を集めて絞り込む。引き継ぎ記録の下書きを作る | ファイルを変更しない |
+| 判断代行役 | 司会役より上の立場で、リーダーの判断基準に照らして承認・却下を決める。仕様の確認と課金だけはリーダー本人に差し戻す | ファイルを変更しない。Git の記録を変えない。ほかの役を呼ばない |
 
 - 役は、道具ごとのサブエージェントとして用意してある（名前は英語：`explorer`・`architect`・`implementer`・`tester`・`reviewer`・`github-manager`・`memory-manager`・`context-manager`）。
   - Claude Code：`.claude/agents/` に全部の役。モデルと推論の強さも定義ファイルに書いてある。
@@ -54,6 +55,9 @@ Codex はこのファイルを直接読みます。Claude Code は `.claude/CLAU
 - モデルの使い分けは、道具ごとの定義ファイルに書いてある（Codex は `.codex/agents/`：実装役は軽いモデル、レビュー役は賢いモデル）。
   Claude Code では、司会役が Opus 5.5、設計役・レビュー役が Sonnet 5.5、ほかの役が Haiku 5.5。格上げの手順は、Claude Code の `moderator` スキル（`.claude/skills/moderator/SKILL.md`）の「格上げ」。
 - Claude Code には、この流れの外で使うハーネス点検（`harness-optimizer`）もある。ハーネスを見直すときだけ使う。
+- Claude Code には、判断代行役（`administrator`）もある。このファイルで「メンバーの『はい』」「メンバーに確認」と書いたものは、
+  Claude Code では判断代行役の「承認」で代えてよい。ただし、仕様の確認が必要なときと、課金が必要なときは、判断代行役がリーダー本人に差し戻す。
+  判断代行役でも、`deny`・フックで止めているものと、「6.」の守るものを弱める変更は承認しない。判断代行役の無い道具（Codex など）では、これまでどおりメンバーに確認する。
 - サブエージェントとして呼ばれた場合は、司会役の仕事はせず、自分の定義ファイルの役割だけを行う。
 - サブエージェントを使えない道具では、実装が終わったら一度会話を閉じ、新しい会話でレビューする。
   レビューの会話には作業メモ・チケット・変更内容（`git diff`）だけを渡す。
@@ -108,7 +112,7 @@ Codex はこのファイルを直接読みます。Claude Code は `.claude/CLAU
 
 - PR を作ったら、その作業ブランチのフォルダをまるごと削除する（例：`rm -rf .ai-tmp/feature-12-plan-view`）。
 - 一時ファイルの中身を、コミットするファイル・コミットメッセージに書き写さない。
-  PR の本文には、目的・機能ごとの結果・確認できていない点だけを書く（チケットの中身は書かない）。
+  PR の本文には、目的・機能ごとの結果・確認できていない点と、issue との紐づけ（「5.」の「Closes #番号」または「issue なし：理由」）だけを書く（チケットの中身は書かない）。
 - 途中の機能は、次の作業で実装役からやり直し、レビューも最初から行う。
 
 ### 流れ
@@ -153,7 +157,16 @@ Codex はこのファイルを直接読みます。Claude Code は `.claude/CLAU
   `feature/〇〇`（新しい機能）・`fix/〇〇`（不具合の修正）・`docs/〇〇`（資料だけの変更）。
   issue があれば番号を先頭に付ける（例：`feature/12-plan-view`）。
   `release/*`・`hotfix/*` は人が作る。
-- **`main` と `develop` へは直接送信しない。** 取り込みは必ず `develop` 向けの PR で、取り込むのは人。
+- **`main` と `develop` へは直接送信しない。** 取り込みは必ず PR で行う。
+  - `develop` 向けの PR は、GitHub の CI（チェック名 `bridal-app-test`：`bridal-app` のテスト）が通ったら自動で取り込む。
+    PR を作ったら、`gh pr merge <番号> --auto --merge` で自動取り込みを予約する（`.github/workflows/bridal-app-test.yml`）。
+  - `main` 向けの PR は、ほかのメンバー1人の承認が必要で、取り込むのは人。
+- **`develop` 向けの PR の本文には、紐づけを必ず1つ書く。**
+  - issue に紐づけるときは「Closes #番号」と書く。取り込まれると、その issue は GitHub が自動で閉じる。
+  - issue が無いときは「issue なし」の直後に全角のコロン「：」（半角の「:」でも可）を付け、理由を書く（例：issue なし：文書の誤字を直すだけのため）。
+  - 確かめる CI はチェック名 `pr-issue-link`（`.github/workflows/pr-issue-link.yml`）。どちらも無いと失敗する。書き方の見本は `.github/pull_request_template.md`。
+  - 本文を直した直後は、反映が遅れて失敗のまま出ることがある。その場合は、失敗したチェックを再実行する。
+  - 今は、このチェックは取り込みに必要なチェックにはしていない（ブランチの保護は変えていない）。
 - 送信（push）と PR 作成は、内容を見せてメンバーの「はい」をもらってから、自分の作業ブランチだけ行う。
 - 最新の `develop` を自分の作業ブランチに取り込む（`merge`）ことだけは、次の条件を守れば行ってよい。
   PR が `develop` と衝突したときや、`develop` の新しい変更が必要なときに使う。
@@ -164,7 +177,7 @@ Codex はこのファイルを直接読みます。Claude Code は `.claude/CLAU
     やめるときは `git merge --abort` で取り込む前に戻す。
   - 解消したら、`bridal-app` に変更があればテスト（`mvnw.cmd -q test`）を実行し、結果を報告してから送信する。
 - 禁止：強制送信（`--force`）、上の条件に合わない取り込み（`merge`）、付け替え（`rebase`）、`reset --hard`、`clean`、
-  ブランチ削除、`git config` の変更、`--no-verify`、PR の取り込み（`gh pr merge`）。
+  ブランチ削除、`git config` の変更、`--no-verify`、自動取り込みの予約（`gh pr merge --auto`）のほかの PR の取り込み、保護を飛ばす取り込み（`gh pr merge --admin`）、取り込みと同時のブランチ削除。
 - コミットメッセージは `feat:`・`fix:`・`docs:`・`style:`・`refactor:`・`test:`・`chore:` で始め、日本語で書く。
   AI が関わったコミットは、最後の行に `Co-authored-by: Claude <noreply@anthropic.com>` を付ける（Codex なら Codex の名前）。
 - コミットの作者はメンバー本人のまま（Git の名前を変えない）。
@@ -175,7 +188,7 @@ Codex はこのファイルを直接読みます。Claude Code は `.claude/CLAU
 ## 6. 変更してはいけないもの
 
 - `AGENTS.md`・`.claude/`・`.codex/`・`.githooks/`・`.gitignore`・`.gitattributes`（リーダーに頼まれたときだけ）
-- 秘密情報：API キーをどこにも書かない（Gemini の API キーは環境変数 `GEMINI_API_KEY`）。`.env` などを読まない。
+- 秘密情報：API キーをどこにも書かない。AI は Sign in with ChatGPT を使い、API キーは使わない。サインインの情報（`npm run sign-in` で `%USERPROFILE%\.creepy-code` に作られる）をリポジトリに入れない・読まない。`.env` などを読まない。
 - `docs/` の Word・PowerPoint・Excel ファイル
 - `db/保留/` の SQL を実行しない。授業用の DB ユーザーとテーブルに触らない。
 
@@ -187,7 +200,7 @@ Codex はこのファイルを直接読みます。Claude Code は `.claude/CLAU
 - テストと、その期待値・判定基準（テストを消す・`@Disabled` で飛ばす・期待値を実装に合わせて緩める、をしない）
 - ログイン・権限の確認など、利用者を守る仕組み
 - フック（`.githooks/`・`.claude/settings.json` の `hooks`）と、許可の設定（`permissions`・`.codex/rules/`）
-- GitHub のブランチの保護（`main`・`develop` への直接の送信禁止、PR 必須）
+- GitHub のブランチの保護（`main`・`develop` への直接の送信禁止、PR 必須、CI `bridal-app-test` の合格が必須、`main` はほかのメンバー1人の承認が必須、管理者にも同じ決まりを適用）と、CI（`.github/workflows/`）
 
 ## 7. 引き継ぎ
 

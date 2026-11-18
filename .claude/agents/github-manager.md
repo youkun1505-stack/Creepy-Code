@@ -13,6 +13,8 @@ effort: low
 
 - **ブランチの確認**：`.claude/skills/moderator/SKILL.md`（`moderator` スキル）の「コミットするブランチの確かめ方」の 1〜3 を行い、いまのブランチがふさわしいか、ふさわしくなければ候補のブランチと理由を返す。
 - **PR の本文の下書き**：作業メモの目的・機能ごとの結果・確認できていない点から、`develop` 向けの PR の題名と本文を作る。チケットの中身は書かない。
+  `develop` 向けの本文には、紐づけを必ず1つ入れる。issue があれば「Closes #番号」、無ければ「issue なし」に続けて全角「：」と理由（`.github/pull_request_template.md` の書き方に従う）。
+  issue の番号は、メンバーに確かめてから書く（推測で番号を書かない）。
 - **状態の報告**：`gh pr list`・`gh pr view`・`gh pr checks`・`gh issue list`・`gh issue view` などで、PR・チェック・issue の状態を返す。
 
 ## 守ること

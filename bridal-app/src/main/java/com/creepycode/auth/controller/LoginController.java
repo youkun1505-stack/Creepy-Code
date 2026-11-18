@@ -2,6 +2,10 @@ package com.creepycode.auth.controller;
 
 import java.util.Optional;
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -9,12 +13,15 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import com.creepycode.auth.dto.DemoLoginForm;
 import com.creepycode.auth.dto.LoginForm;
+import com.creepycode.auth.entity.UserRole;
 import com.creepycode.auth.service.LoginService;
-import com.creepycode.auth.service.LoginService.Account;
+import com.creepycode.auth.service.LoginUser;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 
 /**
@@ -29,46 +36,91 @@ public class LoginController {
     private static final String URL_REGISTER = "/auth/register";
     // TODO: パスワードリセット申請（P-04）ができたら、本当の URL に合わせる（しょたこん）
     private static final String URL_PASSWORD_RESET = "/auth/password-reset";
-    // 種別ごとの行き先。顧客はハブ（いまはログイン機能が無いので、ハブの仮の URL）
-    // TODO: ログイン機能ができたら、顧客はログイン後のトップページ（/）へ進める（しょたこん）
-    private static final String URL_CUSTOMER_HOME = "/after-login-tmp";
-    // TODO: プランナーダッシュボード（P-15）・管理者ダッシュボード（P-18）ができたら、本当の URL に合わせる（しょたこん）
-    private static final String URL_PLANNER_HOME = "/planner/dashboard";
-    private static final String URL_ADMIN_HOME = "/admin/dashboard";
     // どちらが間違っているかは教えない（基本設計書 6-2）
     private static final String FAILED_MESSAGE = "メールアドレスまたはパスワードが正しくありません";
 
     private final LoginService loginService;
+    private final UserDetailsService userDetailsService;
+    private final boolean demoLoginEnabled;
 
-    public LoginController(LoginService loginService) {
+    public LoginController(LoginService loginService, UserDetailsService userDetailsService,
+            @Value("${app.demo-login.enabled:false}") boolean demoLoginEnabled) {
         this.loginService = loginService;
+        this.userDetailsService = userDetailsService;
+        this.demoLoginEnabled = demoLoginEnabled;
     }
 
-    /** ログイン画面を表示する。 */
+    /** ログイン画面を表示する。すでにログインしているときは、種別ごとの画面へ進める。 */
     @GetMapping
-    public String show(Model model) {
+    public String show(@AuthenticationPrincipal LoginUser loginUser, Model model) {
+        if (loginUser != null) {
+            return "redirect:" + loginService.homeUrl(loginUser.getRole());
+        }
         model.addAttribute("loginForm", new LoginForm());
         addLinks(model);
         return VIEW;
     }
 
-    /** メールアドレスとパスワードを確かめ、利用者の種別に合わせた画面へ進める。合わないときは、同じ画面にエラーを出す。 */
+    /** 設定で有効な場合だけ、既存のテスト用顧客としてデモログインする。 */
+    @PostMapping("/demo")
+    public String demoLogin(@AuthenticationPrincipal LoginUser currentUser,
+            @Valid @ModelAttribute DemoLoginForm demoLoginForm, BindingResult bindingResult,
+            Model model, HttpServletRequest request, HttpServletResponse response) {
+        if (currentUser != null) {
+            return "redirect:" + loginService.homeUrl(currentUser.getRole());
+        }
+        if (!demoLoginEnabled) {
+            return "redirect:/auth/login";
+        }
+        if (bindingResult.hasErrors()) {
+            model.addAttribute("loginForm", new LoginForm());
+            addLinks(model);
+            return VIEW;
+        }
+
+        LoginUser demoUser;
+        try {
+            demoUser = (LoginUser) userDetailsService.loadUserByUsername("customer@example.com");
+        } catch (UsernameNotFoundException e) {
+            bindingResult.reject("failed", FAILED_MESSAGE);
+            model.addAttribute("loginForm", new LoginForm());
+            addLinks(model);
+            return VIEW;
+        }
+        if (demoUser.getRole() != UserRole.CUSTOMER || !demoUser.isEnabled()
+                || !demoUser.isAccountNonLocked() || !demoUser.isAccountNonExpired()) {
+            bindingResult.reject("failed", FAILED_MESSAGE);
+            model.addAttribute("loginForm", new LoginForm());
+            addLinks(model);
+            return VIEW;
+        }
+
+        LoginUser namedDemoUser = demoUser.withName(demoLoginForm.getName().strip());
+        loginService.startSession(namedDemoUser, request, response);
+        return "redirect:/";
+    }
+
+    /** メールアドレスとパスワードを確かめ、ログインして種別に合わせた画面へ進める。合わないときは、同じ画面にエラーを出す。 */
     @PostMapping
-    public String login(@Valid @ModelAttribute LoginForm loginForm, BindingResult bindingResult,
-            Model model, RedirectAttributes redirectAttributes) {
+    public String login(@AuthenticationPrincipal LoginUser currentUser,
+            @Valid @ModelAttribute LoginForm loginForm, BindingResult bindingResult,
+            Model model, HttpServletRequest request, HttpServletResponse response) {
+        // ログイン中に別の人としてログインし直すと、前の人のセッションの情報が残るので受け付けない（先にログアウトしてもらう）
+        if (currentUser != null) {
+            return "redirect:" + loginService.homeUrl(currentUser.getRole());
+        }
         if (bindingResult.hasErrors()) {
             return showAgain(loginForm, model);
         }
 
-        Optional<Account> account = loginService.authenticate(loginForm.getEmail(), loginForm.getPassword());
-        if (account.isEmpty()) {
+        Optional<LoginUser> loginUser = loginService.authenticate(loginForm.getEmail(), loginForm.getPassword());
+        if (loginUser.isEmpty()) {
             bindingResult.reject("failed", FAILED_MESSAGE);
             return showAgain(loginForm, model);
         }
 
-        // ハブのヘッダーに、ログインした人の名前を出すために渡す（TopController が受け取る。ログイン機能ができたら不要）
-        redirectAttributes.addFlashAttribute("flashMemberName", account.get().name());
-        return "redirect:" + homeUrl(account.get());
+        loginService.startSession(loginUser.get(), request, response);
+        return "redirect:" + loginService.homeUrl(loginUser.get().getRole());
     }
 
     /** 入力し直してもらうために、同じ画面をもう一度出す。パスワードは画面に戻さない。 */
@@ -82,14 +134,9 @@ public class LoginController {
     private void addLinks(Model model) {
         model.addAttribute("registerUrl", URL_REGISTER);
         model.addAttribute("passwordResetUrl", URL_PASSWORD_RESET);
-    }
-
-    /** 利用者の種別に合わせた、ログイン後の行き先を返す。 */
-    private String homeUrl(Account account) {
-        return switch (account.role()) {
-            case CUSTOMER -> URL_CUSTOMER_HOME;
-            case PLANNER -> URL_PLANNER_HOME;
-            case ADMIN -> URL_ADMIN_HOME;
-        };
+        model.addAttribute("demoLoginEnabled", demoLoginEnabled);
+        if (demoLoginEnabled && !model.containsAttribute("demoLoginForm")) {
+            model.addAttribute("demoLoginForm", new DemoLoginForm());
+        }
     }
 }
