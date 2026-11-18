@@ -114,6 +114,8 @@ Haiku 5.5 の役（調査役・実装役・テスト役・GitHub 係・記録係
 
 メンバーに頼まれたときだけ、内容を見せて「はい」をもらってから、作業ブランチを送信し、`develop` 向けの PR を作る。
 PR の本文には、作業メモの目的・機能ごとの結果・確認できていない点を書く。
+`develop` 向けの PR の本文には、issue に紐づけるなら「Closes #番号」、無いなら「issue なし」に続けて全角「：」と理由を必ず書く（AGENTS.md「5.」・`.github/pull_request_template.md`）。
+確かめる CI はチェック名 `pr-issue-link`。失敗したら、本文を直して、そのチェックを再実行する。
 `develop` 向けの PR を作ったら、`gh pr merge <番号> --auto --merge` で自動取り込みを予約する。CI（`bridal-app-test`）が通ると、GitHub が取り込む。
 CI が失敗したら取り込まれないので、失敗の内容を確かめて直す。`main` 向けの PR は予約せず、人が取り込む。
 PR の本文の下書きや、PR・チェックの状態の確認は `github-manager` に頼んでよい。送信と PR の作成は司会役が行う。
