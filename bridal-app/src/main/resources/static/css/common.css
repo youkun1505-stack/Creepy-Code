@@ -148,6 +148,13 @@ h3 {
 }
 
 /* AIに相談する（P-10）：チャット画面 */
+/* AI の利用の説明（page-lead の下に出す） */
+.deepdive-notice {
+    margin-bottom: 1rem;
+    font-size: var(--font-size-small);
+    color: var(--color-text-sub);
+}
+
 .deepdive-chat__guide {
     margin-bottom: 1.5rem;
     padding: 1rem;
