@@ -145,6 +145,26 @@ class DeepDiveControllerTest {
     }
 
     @Test
+    void 画面にはChatGPTとOpenAIへの送信の説明が_履歴が無くても出る() throws Exception {
+        mockMvc.perform(get("/hearing/deepdive").with(user(CUSTOMER)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(
+                        "このサービスではChatGPTを使用しています。入力した内容と事前ヒアリングの回答は、OpenAI に送られます。")));
+    }
+
+    @Test
+    void 履歴があるときも_ChatGPTとOpenAIへの送信の説明が出る() throws Exception {
+        LocalDateTime time = LocalDateTime.of(2026, 10, 20, 10, 0);
+        when(aiChatService.findHistory(1L)).thenReturn(List.of(
+                message(AiChatMessage.ROLE_USER, "式場の予約はいつ？", time)));
+
+        mockMvc.perform(get("/hearing/deepdive").with(user(CUSTOMER)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(
+                        "このサービスではChatGPTを使用しています。入力した内容と事前ヒアリングの回答は、OpenAI に送られます。")));
+    }
+
+    @Test
     void 発言を受けると_AIの返事を200とJSONで返す() throws Exception {
         when(aiChatService.sendMessage(anyLong(), anyString())).thenReturn(new ChatReply("返事です。", true));
 
