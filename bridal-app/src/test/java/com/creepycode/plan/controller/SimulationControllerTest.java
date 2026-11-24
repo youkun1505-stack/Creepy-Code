@@ -1,13 +1,18 @@
 package com.creepycode.plan.controller;
 
 import static org.hamcrest.Matchers.hasKey;
-import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
@@ -30,14 +35,17 @@ import com.creepycode.auth.service.LoginUser;
 import com.creepycode.common.config.SecurityConfig;
 import com.creepycode.hearing.entity.OnboardingAnswer;
 import com.creepycode.hearing.repository.OnboardingAnswerRepository;
+import com.creepycode.plan.dto.PriceRevisionItemDto;
+import com.creepycode.plan.dto.PriceRevisionSummaryDto;
 import com.creepycode.plan.dto.SimulationResultDto;
 import com.creepycode.plan.entity.PriceMaster;
 import com.creepycode.plan.repository.PriceMasterRepository;
+import com.creepycode.plan.service.PriceRevisionService;
 import com.creepycode.plan.service.SimulationService;
 
 /**
  * 料金シミュレーション画面（P-13）の Controller のテスト。
- * 画面の表示、認可、モデルへの属性設定を検証する。
+ * 画面の表示、認可、価格改定情報の表示、および最新価格更新処理を検証する。
  */
 @WebMvcTest(SimulationController.class)
 @Import(SecurityConfig.class)
@@ -62,6 +70,9 @@ class SimulationControllerTest {
 
     @MockitoBean
     private OnboardingAnswerRepository onboardingAnswerRepository;
+
+    @MockitoBean
+    private PriceRevisionService priceRevisionService;
 
     @MockitoBean
     private UserDetailsService userDetailsService;
@@ -110,6 +121,46 @@ class SimulationControllerTest {
                 .andExpect(model().attribute("categorizedItems", hasKey("会場")))
                 .andExpect(model().attribute("categorizedItems", hasKey("料理")))
                 .andExpect(model().attribute("initialResult", initialResult));
+    }
+
+    @Test
+    @DisplayName("顧客ログイン時かつ価格改定がある場合、モデルに改定サマリーが含まれること")
+    void show_whenCustomerHasPriceRevisions_rendersRevisionSummary() throws Exception {
+        when(onboardingAnswerRepository.findFirstByUserIdOrderByCreatedAtDesc(CUSTOMER.getUserId()))
+                .thenReturn(Optional.empty());
+        when(priceMasterRepository.findAllByDeletedAtIsNullOrderByItemIdAsc())
+                .thenReturn(Collections.emptyList());
+
+        SimulationResultDto initialResult = new SimulationResultDto(Collections.emptyList(), 0L, 3000000);
+        when(simulationService.calculate(anyInt(), any())).thenReturn(initialResult);
+
+        PriceRevisionItemDto revItem = new PriceRevisionItemDto(
+                101L, 1L, "チャペル挙式", "会場", 1, 180000, 200000, false
+        );
+        PriceRevisionSummaryDto summary = new PriceRevisionSummaryDto(10L, false, List.of(revItem));
+        when(priceRevisionService.checkRevisionsForUser(CUSTOMER.getUserId())).thenReturn(Optional.of(summary));
+
+        mockMvc.perform(get(PATH).with(user(CUSTOMER)))
+                .andExpect(status().isOk())
+                .andExpect(view().name("plan/simulation"))
+                .andExpect(model().attribute("revisionSummary", summary));
+    }
+
+    @Test
+    @DisplayName("最新価格に更新（POST）：更新サービスが呼ばれ、シミュレーション画面へリダイレクトされること")
+    void updateToLatestPrices_whenValid_redirectsToSimulationWithSuccessMessage() throws Exception {
+        PriceRevisionSummaryDto updated = new PriceRevisionSummaryDto(10L, false, Collections.emptyList());
+        when(priceRevisionService.updateToLatestPrices(eq(10L), eq(CUSTOMER.getUserId()))).thenReturn(updated);
+
+        mockMvc.perform(post("/plan/simulation/price-revision/update")
+                .with(user(CUSTOMER))
+                .with(csrf())
+                .param("planId", "10"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/plan/simulation"))
+                .andExpect(flash().attribute("successMessage", "プランのオプションを最新の価格に更新しました。"));
+
+        verify(priceRevisionService).updateToLatestPrices(10L, CUSTOMER.getUserId());
     }
 
     @Test

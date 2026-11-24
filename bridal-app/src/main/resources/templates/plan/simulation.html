@@ -17,6 +17,81 @@
             </p>
         </header>
 
+        <!-- フラッシュメッセージ（更新成功・エラー） -->
+        <div class="alert alert-success alert-dismissible fade show mb-4" role="alert" th:if="${successMessage}">
+            <span th:text="${successMessage}">最新価格に更新しました。</span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="閉じる"></button>
+        </div>
+        <div class="alert alert-danger alert-dismissible fade show mb-4" role="alert" th:if="${errorMessage}">
+            <span th:text="${errorMessage}">エラーが発生しました。</span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="閉じる"></button>
+        </div>
+
+        <!-- 価格改定のお知らせ（未合意プランで価格改定がある場合） -->
+        <section class="simulation-revision-box alert alert-warning mb-4"
+                 th:if="${revisionSummary != null and revisionSummary.hasRevisions}">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                <h2 class="h5 mb-0 text-warning-emphasis fw-bold">
+                    📢 料金マスタの価格改定のお知らせ
+                </h2>
+                <form th:action="@{/plan/simulation/price-revision/update}" method="post" class="d-inline">
+                    <input type="hidden" name="planId" th:value="${revisionSummary.planId}">
+                    <button type="submit" class="btn btn-warning btn-sm fw-bold">
+                        最新価格に更新する
+                    </button>
+                </form>
+            </div>
+            <p class="small text-muted mb-3">
+                保存されているプランのオプションの中に、単価が改定されたアイテムが <span class="fw-bold" th:text="${revisionSummary.revisedItemCount}">0</span> 件あります。
+                合意前のプランは勝手に金額を書き換えず、旧価格・新価格・差額を並べて提示しています。「最新価格に更新する」を押すと最新の料金を反映できます。
+            </p>
+
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered bg-white mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>アイテム名</th>
+                            <th>カテゴリ</th>
+                            <th class="text-end">数量</th>
+                            <th class="text-end">旧単価</th>
+                            <th class="text-end">新単価</th>
+                            <th class="text-end">単価差額</th>
+                            <th class="text-end">小計差額</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="revItem : ${revisionSummary.revisedItems}">
+                            <td class="fw-bold" th:text="${revItem.itemName}">アイテム名</td>
+                            <td><span class="badge bg-secondary" th:text="${revItem.category}">カテゴリ</span></td>
+                            <td class="text-end" th:text="${revItem.quantity}">1</td>
+                            <td class="text-end text-muted" th:text="${#numbers.formatInteger(revItem.oldUnitPrice, 1, 'COMMA')} + ' 円'">10,000 円</td>
+                            <td class="text-end fw-bold" th:text="${#numbers.formatInteger(revItem.newUnitPrice, 1, 'COMMA')} + ' 円'">12,000 円</td>
+                            <td class="text-end fw-bold"
+                                th:classappend="${revItem.unitPriceDiff > 0} ? 'text-danger' : 'text-success'"
+                                th:text="${(revItem.unitPriceDiff > 0 ? '+' : '') + #numbers.formatInteger(revItem.unitPriceDiff, 1, 'COMMA')} + ' 円'">
+                                +2,000 円
+                            </td>
+                            <td class="text-end fw-bold"
+                                th:classappend="${revItem.subtotalDiff > 0} ? 'text-danger' : 'text-success'"
+                                th:text="${(revItem.subtotalDiff > 0 ? '+' : '') + #numbers.formatInteger(revItem.subtotalDiff, 1, 'COMMA')} + ' 円'">
+                                +2,000 円
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot class="table-light">
+                        <tr class="fw-bold">
+                            <td colspan="5" class="text-end">差額の合計：</td>
+                            <td colspan="2" class="text-end"
+                                th:classappend="${revisionSummary.totalDiffAmount > 0} ? 'text-danger' : 'text-success'"
+                                th:text="${(revisionSummary.totalDiffAmount > 0 ? '+' : '') + #numbers.formatInteger(revisionSummary.totalDiffAmount, 1, 'COMMA')} + ' 円'">
+                                +2,000 円
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </section>
+
         <!-- メイングリッド：左＝オプション選択、右（または上）＝集計パネル -->
         <div class="simulation-grid">
 

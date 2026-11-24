@@ -262,3 +262,15 @@
     margin-top: 1rem;
     border-radius: 6px;
 }
+
+/* 価格改定のお知らせボックス */
+.simulation-revision-box {
+    border-radius: 8px;
+    border: 1px solid #ffeeba;
+    background-color: #fffdf5;
+    padding: 1.25rem;
+}
+
+.simulation-revision-box .table {
+    font-size: 0.9rem;
+}
