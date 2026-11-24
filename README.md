@@ -124,6 +124,7 @@ graph LR
    .\ai-account.cmd sign-in
    ```
    - ブラウザが開くので、ChatGPT にサインインしてプランの利用を許可します。
+   - ふだんは各自が自分の ChatGPT アカウントでサインインします。アカウントは共有しません。発表のときは仲村のアカウントで動かします。
    - 戻り先の初期ポートは `1455` です。ほかのアプリが使っているときは `.\ai-account.cmd sign-in --port 番号` と指定します。
    - サインインの状態は `.\ai-account.cmd status` で確かめられます。サインイン情報を消すときは `.\ai-account.cmd sign-out` を使います。
    - サインイン情報は `C:\Users\<ユーザー名>\.creepy-code\chatgpt-java` に保存されます（`CREEPY_CODE_HOME` を設定したときは、その下の `chatgpt-java`）。Windows の機能（DPAPI）で暗号化して保存します。
