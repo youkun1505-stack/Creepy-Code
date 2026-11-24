@@ -25,6 +25,9 @@
             <section class="auth-card" aria-labelledby="loginTitle">
                 <h1 class="auth-card__title" id="loginTitle">ログイン</h1>
                 <p class="auth-card__lead">登録したメールアドレスとパスワードを入力してください。</p>
+                <p class="auth-form__summary" role="status" th:if="${flashMessage}" th:text="${flashMessage}">
+                    登録を受け付けました。ログイン画面をご確認ください。
+                </p>
 
                 <!-- 入力チェックはサーバー側で行い、メッセージの出し方をそろえるため、ブラウザの入力チェック（吹き出し）は止めている -->
                 <form class="auth-form" th:action="@{/auth/login}" th:object="${loginForm}" method="post" novalidate>
