@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ja" xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{common/layout}">
+<head>
+    <title>リアルタイム料金シミュレーション</title>
+    <link rel="stylesheet" th:href="@{/css/simulation.css}">
+</head>
+<body>
+    <main layout:fragment="content" class="container simulation-page">
+
+        <!-- 画面見出し -->
+        <header class="simulation-header">
+            <p class="simulation-header__eyebrow">P-13 リアルタイム試算</p>
+            <h1 class="simulation-header__title">料金シミュレーション</h1>
+            <p class="simulation-header__lead">
+                ご希望のオプションを選ぶと、リアルタイムに概算の予定金額と予算残額を計算します。
+            </p>
+        </header>
+
+        <!-- メイングリッド：左＝オプション選択、右（または上）＝集計パネル -->
+        <div class="simulation-grid">
+
+            <!-- 左側：カテゴリ別オプション一覧 -->
+            <section class="simulation-items" aria-labelledby="optionsTitle">
+                <h2 class="visually-hidden" id="optionsTitle">オプション一覧</h2>
+
+                <!-- カテゴリごとにループ表示 -->
+                <div class="simulation-category" th:each="entry : ${categorizedItems}">
+                    <h3 class="simulation-category__title" th:text="${entry.key}">カテゴリ名</h3>
+
+                    <div class="simulation-card-list">
+                        <div class="simulation-card" th:each="item : ${entry.value}"
+                             th:attr="data-item-id=${item.itemId},
+                                      data-base-price=${item.basePrice},
+                                      data-variable=${item.variable}">
+
+                            <div class="simulation-card__body">
+                                <div class="simulation-card__header">
+                                    <h4 class="simulation-card__name" th:text="${item.itemName}">アイテム名</h4>
+                                    <span class="badge simulation-badge--fixed" th:if="${!item.variable}">固定</span>
+                                    <span class="badge simulation-badge--variable" th:if="${item.variable}">人数等で変動</span>
+                                </div>
+                                <p class="simulation-card__desc" th:if="${item.description != null}" th:text="${item.description}">説明文</p>
+                                <p class="simulation-card__price">
+                                    単価：<span class="simulation-card__price-num" th:text="${#numbers.formatInteger(item.basePrice, 1, 'COMMA')}">10,000</span> 円
+                                    <span class="small text-muted" th:if="${item.variable}">（1人あたり）</span>
+                                </p>
+                            </div>
+
+                            <div class="simulation-card__control">
+                                <!-- 固定アイテムの場合：チェックボックス -->
+                                <div class="form-check" th:if="${!item.variable}">
+                                    <input class="form-check-input simulation-input--check js-calc-input"
+                                           type="checkbox"
+                                           th:id="'item-' + ${item.itemId}"
+                                           th:attr="data-item-id=${item.itemId}">
+                                    <label class="form-check-label" th:for="'item-' + ${item.itemId}">追加する</label>
+                                </div>
+
+                                <!-- 変動アイテムの場合：数量（人数）入力 -->
+                                <div class="simulation-qty-box" th:if="${item.variable}">
+                                    <label class="simulation-qty-box__label" th:for="'qty-' + ${item.itemId}">数量（人数）</label>
+                                    <div class="input-group input-group-sm simulation-qty-group">
+                                        <button class="btn btn-outline-secondary js-qty-btn" type="button" data-delta="-10">-10</button>
+                                        <button class="btn btn-outline-secondary js-qty-btn" type="button" data-delta="-1">-</button>
+                                        <input type="number" class="form-control text-center simulation-input--qty js-calc-input"
+                                               th:id="'qty-' + ${item.itemId}"
+                                               th:attr="data-item-id=${item.itemId}"
+                                               value="0" min="0" max="300" step="1">
+                                        <button class="btn btn-outline-secondary js-qty-btn" type="button" data-delta="1">+</button>
+                                        <button class="btn btn-outline-secondary js-qty-btn" type="button" data-delta="10">+10</button>
+                                    </div>
+                                </div>
+
+                                <!-- 小計表示 -->
+                                <div class="simulation-subtotal">
+                                    小計：<span class="simulation-subtotal__num js-item-subtotal">0</span> 円
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- 右側：スティッキー集計パネル -->
+            <aside class="simulation-summary-panel">
+                <div class="simulation-summary-card">
+                    <h2 class="simulation-summary-card__title">お見積り試算サマリー</h2>
+
+                    <div class="simulation-summary-row">
+                        <span class="simulation-summary-row__label">設定ご予算</span>
+                        <span class="simulation-summary-row__val">
+                            <span id="summaryBudget" th:text="${#numbers.formatInteger(budget, 1, 'COMMA')}">3,000,000</span> 円
+                        </span>
+                    </div>
+
+                    <div class="simulation-summary-row simulation-summary-row--highlight">
+                        <span class="simulation-summary-row__label">予定金額（累計）</span>
+                        <span class="simulation-summary-row__val">
+                            <span id="summaryTotal" class="simulation-total-num">0</span> 円
+                        </span>
+                    </div>
+
+                    <div class="simulation-summary-row" id="remainingRow">
+                        <span class="simulation-summary-row__label">予算残額</span>
+                        <span class="simulation-summary-row__val">
+                            <span id="summaryRemaining" class="simulation-remaining-num"
+                                  th:text="${#numbers.formatInteger(budget, 1, 'COMMA')}">3,000,000</span> 円
+                        </span>
+                    </div>
+
+                    <!-- 予算超過警告（初期は非表示） -->
+                    <div class="alert alert-danger simulation-alert d-none" id="overBudgetAlert" role="alert">
+                        <strong>⚠️ ご予算を超過しています</strong>
+                        <p class="mb-0 small mt-1">
+                            予算より <span id="overAmountNum" class="fw-bold">0</span> 円超過しています。オプションを見直すか、プランナーにご相談ください。
+                        </p>
+                    </div>
+
+                    <hr class="my-3">
+
+                    <div class="simulation-summary-actions">
+                        <a class="btn btn-outline-secondary w-100 mb-2" th:href="@{/}">ホーム（トップ）へ戻る</a>
+                    </div>
+                </div>
+            </aside>
+
+        </div>
+
+    </main>
+
+    <!-- 専用スクリプト読み込み -->
+    <th:block layout:fragment="scripts">
+        <script th:src="@{/js/simulation.js}"></script>
+    </th:block>
+</body>
+</html>

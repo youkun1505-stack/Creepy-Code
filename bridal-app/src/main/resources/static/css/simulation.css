@@ -1,0 +1,264 @@
+/* リアルタイム料金シミュレーション（P-13）用スタイル */
+
+.simulation-page {
+    padding-top: 2rem;
+    padding-bottom: 4rem;
+}
+
+.simulation-header {
+    margin-bottom: 2rem;
+    border-bottom: 1px solid #e5e5e5;
+    padding-bottom: 1rem;
+}
+
+.simulation-header__eyebrow {
+    font-size: 0.85rem;
+    color: #8b7355;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.simulation-header__title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #2c2c2c;
+    margin-bottom: 0.5rem;
+}
+
+.simulation-header__lead {
+    font-size: 0.95rem;
+    color: #666;
+    margin-bottom: 0;
+}
+
+/* メイングリッド：左＝アイテム、右＝集計パネル（スティッキー） */
+.simulation-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2rem;
+}
+
+@media (min-width: 992px) {
+    .simulation-grid {
+        grid-template-columns: 1fr 340px;
+        align-items: start;
+    }
+}
+
+/* カテゴリセクション */
+.simulation-category {
+    margin-bottom: 2.5rem;
+}
+
+.simulation-category__title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #333;
+    padding-left: 0.75rem;
+    border-left: 4px solid #c5a880;
+    margin-bottom: 1rem;
+}
+
+/* アイテムカード */
+.simulation-card-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.simulation-card {
+    background: #fff;
+    border: 1px solid #e8e8e8;
+    border-radius: 8px;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: all 0.2s ease-in-out;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.simulation-card:hover {
+    border-color: #d1bfa7;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.06);
+}
+
+.simulation-card--selected {
+    border-color: #c5a880;
+    background-color: #fdfcf9;
+}
+
+.simulation-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.simulation-card__name {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #222;
+    margin-bottom: 0;
+}
+
+.simulation-card__desc {
+    font-size: 0.85rem;
+    color: #777;
+    margin-bottom: 0.5rem;
+}
+
+.simulation-card__price {
+    font-size: 0.95rem;
+    color: #444;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+}
+
+.simulation-card__price-num {
+    font-size: 1.15rem;
+    color: #333;
+}
+
+/* バッジ */
+.simulation-badge--fixed {
+    background-color: #eee4d5;
+    color: #73532c;
+    font-weight: 600;
+    font-size: 0.75rem;
+}
+
+.simulation-badge--variable {
+    background-color: #e3effa;
+    color: #1f5f99;
+    font-weight: 600;
+    font-size: 0.75rem;
+}
+
+/* コントロール部分（チェックボックス・数量・小計） */
+.simulation-card__control {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 0.75rem;
+    border-top: 1px dashed #eee;
+    gap: 0.75rem;
+}
+
+.simulation-input--check {
+    width: 1.25rem;
+    height: 1.25rem;
+    cursor: pointer;
+}
+
+.simulation-qty-box {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.simulation-qty-box__label {
+    font-size: 0.8rem;
+    color: #555;
+    margin-bottom: 0;
+}
+
+.simulation-qty-group {
+    max-width: 200px;
+}
+
+.simulation-input--qty {
+    max-width: 60px;
+    font-weight: 700;
+}
+
+.simulation-subtotal {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #555;
+    margin-left: auto;
+}
+
+.simulation-subtotal__num {
+    font-size: 1.1rem;
+    color: #b3884b;
+}
+
+/* 集計パネル（スティッキー） */
+.simulation-summary-panel {
+    position: sticky;
+    top: 1.5rem;
+}
+
+.simulation-summary-card {
+    background: #fff;
+    border: 1px solid #dedede;
+    border-radius: 10px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.simulation-summary-card__title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #2c2c2c;
+    border-bottom: 2px solid #c5a880;
+    padding-bottom: 0.75rem;
+    margin-bottom: 1.25rem;
+}
+
+.simulation-summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid #f2f2f2;
+}
+
+.simulation-summary-row__label {
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.simulation-summary-row__val {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #333;
+}
+
+.simulation-summary-row--highlight {
+    background-color: #faf7f2;
+    padding: 0.75rem 0.5rem;
+    border-radius: 6px;
+    border-bottom: none;
+    margin: 0.5rem 0;
+}
+
+.simulation-summary-row--highlight .simulation-summary-row__label {
+    font-weight: 700;
+    color: #333;
+}
+
+.simulation-total-num {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: #a8793b;
+}
+
+.simulation-remaining-num {
+    font-size: 1.15rem;
+    font-weight: 700;
+}
+
+.simulation-remaining-num--negative {
+    color: #dc3545 !important;
+}
+
+.simulation-alert {
+    margin-top: 1rem;
+    border-radius: 6px;
+}
