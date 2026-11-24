@@ -3,10 +3,10 @@
 - 決めた日・確かめた日：2026-10-14
 - 確かさ：高（実装済み。PR #35・コミット fc88ec7）
 - 当てはまる場面：AI 呼び出し（P-10 など）の開発・設定・実行
-- 根拠：チーム決定（2026-10-14）、GitHub issue #37、PR #35、コミット fc88ec7、ai-relay/、bridal-app/src/main/resources/application.properties、bridal-app/ai-account.cmd、bridal-app/src/main/java/com/creepycode/common/ai/chatgpt/ChatGptSignInMain.java、ChatGptAutoSignIn.java、ChatGptConfig.java、ChatGptEndpoints.java（2026-11-18 に確かめた）
+- 根拠：チーム決定（2026-10-14）、GitHub issue #37、PR #35、コミット fc88ec7、ai-relay/（2026-11-24 に削除。それより前のコミットの履歴で確認できる）、bridal-app/src/main/resources/application.properties、bridal-app/ai-account.cmd、bridal-app/src/main/java/com/creepycode/common/ai/chatgpt/ChatGptSignInMain.java、ChatGptAutoSignIn.java、ChatGptConfig.java、ChatGptEndpoints.java（2026-11-18 に確かめた）
 
 ## 中身
-AI を呼ぶ方式を、Gemini API から **Sign in with ChatGPT**（ChatGPT のプランの利用枠を使う方式）に変更した。2026-10-14 の決定の時点では中継プログラム（`ai-relay/`）を経由していたが、develop の #45 で中継を経由せず、ChatGPT の Responses API を直接呼ぶ形に変わった（詳しくは「直した記録」）。
+AI を呼ぶ方式を、Gemini API から **Sign in with ChatGPT**（ChatGPT のプランの利用枠を使う方式）に変更した。2026-10-14 の決定の時点では中継プログラム（`ai-relay/`）を経由していたが、develop の #45 で中継を経由せず、ChatGPT の Responses API を直接呼ぶ形に変わった。中継プログラム（`ai-relay/`）は 2026-11-24 に削除した（ブランチ docs/cleanup-files-and-docs のコミット `aef4ec7`。詳しくは「直した記録」）。
 
 - **API キーは使わない**：API キー（`GEMINI_API_KEY` 等）は不要となり、環境変数や設定ファイルにも書かない。
 - **サインイン方式**：`bridal-app` フォルダで `ai-account.cmd sign-in` を実行し、ブラウザで ChatGPT にサインインする（Java のコマンド。Spring は起動しない。各メンバーが自分のアカウント。発表は仲村のアカウント。詳しくは [AI の利用の前提](ai-usage-premise.md)）。
@@ -16,8 +16,6 @@ AI を呼ぶ方式を、Gemini API から **Sign in with ChatGPT**（ChatGPT の
 ## 確かめられていないこと
 - サインインの有効期限が切れたときの挙動（Issue #37 より）。
 - 上の手順と設定は、コードを読んで確かめた（2026-11-18）。実際に `ai-account.cmd sign-in` でサインインして、`APP_AI_MODE=chatgpt` で本物の AI が返答するところまで動かしたことは、まだ確かめていない。
-- `ai-relay/` のフォルダと `npm` のスクリプト（`sign-in`・`start`）は、リポジトリに今も残っている。ただし、今のアプリはそれを使わない（`ChatGptConfig.java` に中継の記述が無く、接続先は `ChatGptEndpoints.java:17` の OpenAI の URL）。残す・消すの判断はこの記録の対象外。
-
 ## 直した記録
 - 2026-11-18：12 行目の「チームでは仲村のアカウントを使用」を「各メンバーが自分のアカウント。発表は仲村のアカウント」に直した。理由：issue #69 で、アカウントは共有せず各メンバーが自分のものを使うと決まったため。根拠：仲村さんの決定（2026-11-18）、GitHub issue #69、新しい記録 [AI の利用の前提](ai-usage-premise.md)。
 - 2026-11-18：13 行目の保存先 `%USERPROFILE%\.creepy-code\chatgpt` を `…\chatgpt-java`（`CREEPY_CODE_HOME` があればその下）に直した。理由：コードの保存先と合わせるため。根拠：`bridal-app/src/main/java/com/creepycode/common/ai/chatgpt/ChatGptCredentialStore.java:36-37`（`HOME_FOLDER_NAME = ".creepy-code"`、`STORE_FOLDER_NAME = "chatgpt-java"`）と `resolveDirectory`（68-73 行）。
@@ -29,4 +27,12 @@ AI を呼ぶ方式を、Gemini API から **Sign in with ChatGPT**（ChatGPT の
   - 13 行目（保存先）：変えていない。`ChatGptCredentialStore.java:36-37, 62-73` で、`CREEPY_CODE_HOME` があればその下の `chatgpt-java`、なければ `%USERPROFILE%\.creepy-code\chatgpt-java` と確かめた。
   - 14 行目：`npm start` の記述を削除し、「`npm start` は不要。アプリは中継を経由せず直接呼ぶ」と書いた。`APP_AI_AUTO_SIGN_IN`（初期値 true）と戻り先のポート 1455 を足した。Eclipse の記述は、起動の仕方を確かめていないので削除した。根拠：`bridal-app/src/main/resources/application.properties:55-61`、`ChatGptConfig.java:14`、`ChatGptAutoSignIn.java:58-61, 93`、`ChatGptSignInMain.java:16`。
   - 確かめられていないこと：中継の記述を、「コードを読んで確かめた。実際に動かしたことは未確認」と書き換えた。理由：AGENTS.md の「設定ファイルに書いただけで効いているとは書かない」に合わせるため。
-- 注：`ai-relay/`（`npm run sign-in`・`npm start` を持つ）は、リポジトリに今も残っている（`ai-relay/package.json`）。今のアプリはそれを使わないが、消すかどうかは、この記録では判断していない。
+- 2026-11-24：`ai-relay/` の削除に合わせて、19 行目と 32 行目を直した。
+  - 19 行目：「リポジトリに今も残っている。…残す・消すの判断はこの記録の対象外。」を、削除したことと、develop にはまだ取り込まれていない（PR 前）ことを書く文に置き換えた。
+  - 32 行目（注）：「`ai-relay/`（`npm run sign-in`・`npm start` を持つ）は、リポジトリに今も残っている（`ai-relay/package.json`）。…消すかどうかは、この記録では判断していない。」を、削除の事実を書いたこの項目に置き換えた。
+  - 理由：メンバー（仲村さん）が 2026-11-24 に、使われていない `ai-relay/` を削除すると決めたため。
+  - 根拠：仲村さんの決定（2026-11-24）、コミット `aef4ec7`（司会役から渡された情報。`git show --stat aef4ec7` で、ai-relay/ の 6 ファイルの削除と README.md の変更を確かめた（2026-11-24、レビュー役））。同じコミットで README.md の AI の手順も `bridal-app\ai-account.cmd sign-in` に直されている。
+- 2026-11-24（記録係）：レビュー役の指摘（重さ「低」）に合わせて、次の 3 点を直した。根拠：レビュー役の指摘（2026-11-24）、コミット `aef4ec7`。
+  - 「確かめられていないこと」から、`ai-relay/` の削除の文を外した。理由：その節は確かめられていないことを書く場所で、削除は確かめた事実のため。「develop に取り込まれていない（PR 前）」のように時間がたつと誤りになる文は書かず、「ブランチ docs/cleanup-files-and-docs のコミット `aef4ec7`」と書いた。削除の事実は「中身」と、この項目の上の 2026-11-24 の項目に残した。
+  - 根拠の「記録係は Git を操作しないため確かめていない」を外し、`git show --stat aef4ec7` で 6 ファイルの削除と README.md の変更を確かめたと書いた（レビュー役）。理由：確かめた結果を記録として残すため。
+  - 根拠の一覧（6 行目）の `ai-relay/` の後ろに、2026-11-24 に削除したこととそれより前のコミットの履歴で確認できることを添えた。理由：今はないフォルダを根拠に挙げていることが分かるようにするため。
